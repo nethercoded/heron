@@ -26,11 +26,12 @@ const (
 )
 
 type statusDTO struct {
-	Page      store.Page    `json:"page"`
-	Status    overall       `json:"status"`
-	Groups    []groupDTO    `json:"groups"`
-	Incidents []incidentDTO `json:"incidents"`
-	UpdatedAt stamp         `json:"updated_at"`
+	Page        store.Page       `json:"page"`
+	Status      overall          `json:"status"`
+	Groups      []groupDTO       `json:"groups"`
+	Incidents   []incidentDTO    `json:"incidents"`
+	Maintenance []maintenanceDTO `json:"maintenance"`
+	UpdatedAt   stamp            `json:"updated_at"`
 }
 
 func (s *Server) status(w http.ResponseWriter, r *http.Request) error {
@@ -71,11 +72,12 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) error {
 
 	w.Header().Set("Cache-Control", "no-cache")
 	return ok(w, statusDTO{
-		Page:      page,
-		Status:    summarize(public, active),
-		Groups:    groups,
-		Incidents: incidents,
-		UpdatedAt: stamp(time.Now()),
+		Page:        page,
+		Status:      summarize(public, active),
+		Groups:      groups,
+		Incidents:   incidents,
+		Maintenance: s.publicMaintenance(byID, time.Now()),
+		UpdatedAt:   stamp(time.Now()),
 	})
 }
 
@@ -162,16 +164,18 @@ func fillDays(data []store.Day, from time.Time, n int, loc *time.Location) []day
 
 func summarize(monitors []*monitor.Monitor, active []*store.Incident) overall {
 	var down, degraded int
+	var critical, maintenance, other bool
 	for _, m := range monitors {
 		switch m.State.Status {
 		case monitor.StatusDown:
 			down++
 		case monitor.StatusDegraded:
 			degraded++
+		case monitor.StatusMaintenance:
+			maintenance = true
 		}
 	}
 
-	var critical, maintenance, other bool
 	for _, inc := range active {
 		switch inc.Impact {
 		case store.ImpactCritical:

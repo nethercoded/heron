@@ -19,6 +19,7 @@ import (
 
 	"github.com/nethercode/heron/internal/auth"
 	"github.com/nethercode/heron/internal/engine"
+	"github.com/nethercode/heron/internal/maintenance"
 	"github.com/nethercode/heron/internal/monitor"
 	"github.com/nethercode/heron/internal/notify"
 	"github.com/nethercode/heron/internal/scheduler"
@@ -87,7 +88,7 @@ func newHarness(t *testing.T) *harness {
 	t.Cleanup(func() { db.Close() })
 
 	log := slog.New(slog.DiscardHandler)
-	eng := engine.New(db, nopSender{}, log, "https://status.example.com")
+	eng := engine.New(db, nopSender{}, maintenance.NewCalendar(time.UTC), log, "https://status.example.com")
 	sched := &fakeScheduler{synced: map[int64]*monitor.Monitor{}}
 	assets := fstest.MapFS{
 		"index.html":               {Data: []byte("<!doctype html><title>heron</title>")},
@@ -252,6 +253,60 @@ func TestMonitorFlow(t *testing.T) {
 	h.expect("POST", "/api/admin/monitors/"+itoa(site.ID)+"/check", nil, http.StatusConflict, nil)
 	h.expect("DELETE", "/api/admin/monitors/"+itoa(hidden.ID), nil, http.StatusNoContent, nil)
 	h.expect("GET", "/api/admin/monitors/"+itoa(hidden.ID), nil, http.StatusNotFound, nil)
+}
+
+func TestMaintenanceSuppressesIncidents(t *testing.T) {
+	h := newHarness(t)
+	h.signIn()
+
+	var db adminMonitorDTO
+	h.expect("POST", "/api/admin/monitors", monitorInput{Name: "Database", Kind: monitor.KindTCP, Target: "db:5432", IntervalS: 60, Public: true}, http.StatusCreated, &db)
+
+	h.expect("POST", "/api/admin/maintenance", maintenanceInput{Title: "Upgrade"}, http.StatusUnprocessableEntity, nil)
+
+	var window maintenanceDTO
+	h.expect("POST", "/api/admin/maintenance", maintenanceInput{
+		Title:      "Postgres upgrade",
+		MonitorIDs: []int64{db.ID},
+		StartsAt:   time.Now().Add(-time.Minute),
+		DurationS:  3600,
+		Repeat:     "weekly",
+		Enabled:    true,
+	}, http.StatusCreated, &window)
+	if !window.Active {
+		t.Fatalf("window should be active: %+v", window)
+	}
+
+	m, _ := h.store.Monitor(t.Context(), db.ID)
+	beat := func(status monitor.Status) {
+		h.engine.Record(t.Context(), scheduler.Beat{
+			Monitor:  m,
+			Result:   monitor.Result{Status: status, Message: "connection refused", At: time.Now()},
+			Previous: monitor.StatusUp,
+			Current:  status,
+		})
+	}
+	beat(monitor.StatusDown)
+
+	var status statusDTO
+	h.expect("GET", "/api/status", nil, http.StatusOK, &status)
+	if len(status.Incidents) != 0 {
+		t.Errorf("incident opened during maintenance: %+v", status.Incidents)
+	}
+	if got := status.Groups[0].Monitors[0].Status; got != monitor.StatusMaintenance {
+		t.Errorf("monitor status = %s", got)
+	}
+	if status.Status != overallMaintenance || len(status.Maintenance) != 1 || !status.Maintenance[0].Active {
+		t.Errorf("status = %s, maintenance = %+v", status.Status, status.Maintenance)
+	}
+
+	h.expect("DELETE", "/api/admin/maintenance/"+itoa(window.ID), nil, http.StatusNoContent, nil)
+	beat(monitor.StatusDown)
+
+	h.expect("GET", "/api/status", nil, http.StatusOK, &status)
+	if len(status.Incidents) != 1 {
+		t.Errorf("an outage after maintenance must open an incident, got %d", len(status.Incidents))
+	}
 }
 
 func TestPush(t *testing.T) {

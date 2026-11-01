@@ -24,6 +24,7 @@ import (
 	"github.com/nethercode/heron/internal/config"
 	"github.com/nethercode/heron/internal/engine"
 	"github.com/nethercode/heron/internal/httpapi"
+	"github.com/nethercode/heron/internal/maintenance"
 	"github.com/nethercode/heron/internal/monitor"
 	"github.com/nethercode/heron/internal/notify"
 	"github.com/nethercode/heron/internal/scheduler"
@@ -129,7 +130,10 @@ func serve(args []string) error {
 		UserAgent: userAgent,
 	}, log.With("component", "notify"))
 
-	eng := engine.New(db, dispatcher, log.With("component", "engine"), cfg.PublicURL)
+	eng := engine.New(db, dispatcher, maintenance.NewCalendar(cfg.Location), log.With("component", "engine"), cfg.PublicURL)
+	if err := eng.ReloadMaintenance(ctx); err != nil {
+		return fmt.Errorf("load maintenance windows: %w", err)
+	}
 	sched := scheduler.New(monitor.NewRegistry(userAgent, cfg.ICMPPrivileged), eng, log.With("component", "scheduler"))
 
 	monitors, err := db.Monitors(ctx)
@@ -140,6 +144,7 @@ func serve(args []string) error {
 	runCtx, cancelRun := context.WithCancel(context.Background())
 	sched.Start(runCtx, monitors)
 	go eng.Housekeep(runCtx, time.Duration(cfg.RetentionDays)*24*time.Hour)
+	go eng.WatchMaintenance(runCtx)
 
 	api := httpapi.New(db, eng, sched, dispatcher, auth.NewSessions(db, cfg.SecureCookies()), log.With("component", "http"), httpapi.Options{
 		Version:        ver,

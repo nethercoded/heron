@@ -28,11 +28,12 @@ var Kinds = []Kind{KindHTTP, KindTCP, KindICMP, KindDNS, KindPush}
 type Status string
 
 const (
-	StatusPending  Status = "pending"
-	StatusUp       Status = "up"
-	StatusDegraded Status = "degraded"
-	StatusDown     Status = "down"
-	StatusPaused   Status = "paused"
+	StatusPending     Status = "pending"
+	StatusUp          Status = "up"
+	StatusDegraded    Status = "degraded"
+	StatusDown        Status = "down"
+	StatusPaused      Status = "paused"
+	StatusMaintenance Status = "maintenance"
 )
 
 func (s Status) Healthy() bool {

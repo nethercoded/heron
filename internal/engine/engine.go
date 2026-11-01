@@ -5,9 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
+	"sync"
 	"time"
 
 	"github.com/nethercode/heron/internal/broker"
+	"github.com/nethercode/heron/internal/maintenance"
 	"github.com/nethercode/heron/internal/monitor"
 	"github.com/nethercode/heron/internal/notify"
 	"github.com/nethercode/heron/internal/scheduler"
@@ -41,17 +44,23 @@ type Engine struct {
 	store     *store.Store
 	notifier  Notifier
 	events    *broker.Broker[Event]
+	calendar  *maintenance.Calendar
 	log       *slog.Logger
 	publicURL string
+
+	mu   sync.Mutex
+	last map[int64]monitor.Status
 }
 
-func New(s *store.Store, n Notifier, log *slog.Logger, publicURL string) *Engine {
+func New(s *store.Store, n Notifier, calendar *maintenance.Calendar, log *slog.Logger, publicURL string) *Engine {
 	return &Engine{
 		store:     s,
 		notifier:  n,
 		events:    broker.New[Event](32),
+		calendar:  calendar,
 		log:       log,
 		publicURL: publicURL,
+		last:      map[int64]monitor.Status{},
 	}
 }
 
@@ -59,24 +68,59 @@ func (e *Engine) Events() *broker.Broker[Event] {
 	return e.events
 }
 
+func (e *Engine) Calendar() *maintenance.Calendar {
+	return e.calendar
+}
+
+func (e *Engine) ReloadMaintenance(ctx context.Context) error {
+	windows, err := e.store.MaintenanceWindows(ctx)
+	if err != nil {
+		return err
+	}
+	e.calendar.Set(windows)
+	e.events.Publish(Event{Type: EventLayout, Public: true})
+	return nil
+}
+
 func (e *Engine) Record(ctx context.Context, beat scheduler.Beat) {
 	m, res := beat.Monitor, beat.Result
 	log := e.log.With("monitor", m.Slug)
 
-	if err := e.store.Record(ctx, m.ID, res, beat.Current); err != nil {
+	current := beat.Current
+	if _, ok := e.calendar.Active(m.ID, res.At); ok {
+		current = monitor.StatusMaintenance
+		if !res.Status.Healthy() {
+			res.Status = monitor.StatusMaintenance
+		}
+	}
+
+	e.mu.Lock()
+	previous, seen := e.last[m.ID]
+	if !seen {
+		previous = beat.Previous
+	}
+	e.last[m.ID] = current
+	e.mu.Unlock()
+
+	if err := e.store.Record(ctx, m.ID, res, current); err != nil {
 		log.Error("record result", "err", err)
 		return
 	}
 
 	switch {
-	case beat.WentDown():
+	case current == monitor.StatusDown && previous != monitor.StatusDown:
 		log.Warn("monitor is down", "reason", res.Message)
 		e.wentDown(ctx, m, res)
-	case beat.Recovered():
+	case previous == monitor.StatusDown && current.Healthy():
 		log.Info("monitor recovered", "latency", res.Latency)
 		e.recovered(ctx, m, res)
-	case beat.Previous != beat.Current:
-		log.Info("status changed", "from", beat.Previous, "to", beat.Current)
+	case previous == monitor.StatusDown && current == monitor.StatusMaintenance:
+		log.Info("maintenance started while down")
+		e.resolve(ctx, m, res.At, func(time.Duration) string {
+			return "Scheduled maintenance has started for this service."
+		})
+	case previous != current:
+		log.Info("status changed", "from", previous, "to", current)
 	}
 
 	e.events.Publish(Event{
@@ -84,11 +128,41 @@ func (e *Engine) Record(ctx context.Context, beat scheduler.Beat) {
 		MonitorID: m.ID,
 		Slug:      m.Slug,
 		Public:    m.Public,
-		Status:    beat.Current,
+		Status:    current,
 		Latency:   res.Latency,
 		Message:   res.Message,
 		At:        res.At,
 	})
+}
+
+func (e *Engine) Forget(id int64) {
+	e.mu.Lock()
+	delete(e.last, id)
+	e.mu.Unlock()
+}
+
+func (e *Engine) WatchMaintenance(ctx context.Context) {
+	var active []int64
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+	for {
+		var now []int64
+		for _, s := range e.calendar.Upcoming(time.Now(), 0) {
+			if s.Active {
+				now = append(now, s.ID)
+			}
+		}
+		if !slices.Equal(now, active) {
+			e.events.Publish(Event{Type: EventLayout, Public: true})
+		}
+		active = now
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 func (e *Engine) wentDown(ctx context.Context, m *monitor.Monitor, res monitor.Result) {
@@ -122,20 +196,9 @@ func (e *Engine) wentDown(ctx context.Context, m *monitor.Monitor, res monitor.R
 }
 
 func (e *Engine) recovered(ctx context.Context, m *monitor.Monitor, res monitor.Result) {
-	var downtime time.Duration
-	inc, err := e.store.OpenAutomaticIncident(ctx, m.ID)
-	switch {
-	case err == nil:
-		downtime = res.At.Sub(inc.StartedAt)
-		body := fmt.Sprintf("Service recovered after %s.", downtime.Round(time.Second))
-		if _, err := e.store.AddIncidentUpdate(ctx, inc.ID, store.IncidentResolved, body); err != nil {
-			e.log.Error("resolve incident", "monitor", m.Slug, "err", err)
-		} else {
-			e.events.Publish(Event{Type: EventIncident})
-		}
-	case !errors.Is(err, store.ErrNotFound):
-		e.log.Error("find incident", "monitor", m.Slug, "err", err)
-	}
+	downtime := e.resolve(ctx, m, res.At, func(d time.Duration) string {
+		return fmt.Sprintf("Service recovered after %s.", d.Round(time.Second))
+	})
 
 	e.notify(ctx, m, notify.Message{
 		Event:    notify.EventRecovered,
@@ -144,6 +207,23 @@ func (e *Engine) recovered(ctx context.Context, m *monitor.Monitor, res monitor.
 		At:       res.At,
 		Downtime: downtime,
 	})
+}
+
+func (e *Engine) resolve(ctx context.Context, m *monitor.Monitor, at time.Time, body func(time.Duration) string) time.Duration {
+	inc, err := e.store.OpenAutomaticIncident(ctx, m.ID)
+	if err != nil {
+		if !errors.Is(err, store.ErrNotFound) {
+			e.log.Error("find incident", "monitor", m.Slug, "err", err)
+		}
+		return 0
+	}
+	downtime := at.Sub(inc.StartedAt)
+	if _, err := e.store.AddIncidentUpdate(ctx, inc.ID, store.IncidentResolved, body(downtime)); err != nil {
+		e.log.Error("resolve incident", "monitor", m.Slug, "err", err)
+		return downtime
+	}
+	e.events.Publish(Event{Type: EventIncident})
+	return downtime
 }
 
 func (e *Engine) notify(ctx context.Context, m *monitor.Monitor, msg notify.Message) {

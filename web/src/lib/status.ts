@@ -5,7 +5,8 @@ export const statusLabel: Record<Status, string> = {
 	degraded: 'Degraded',
 	down: 'Down',
 	pending: 'Pending',
-	paused: 'Paused'
+	paused: 'Paused',
+	maintenance: 'Maintenance'
 };
 
 export const statusTone: Record<Status, string> = {
@@ -13,7 +14,8 @@ export const statusTone: Record<Status, string> = {
 	degraded: 'bg-degraded',
 	down: 'bg-down',
 	pending: 'bg-pending',
-	paused: 'bg-paused'
+	paused: 'bg-paused',
+	maintenance: 'bg-accent'
 };
 
 export const statusText: Record<Status, string> = {
@@ -21,15 +23,25 @@ export const statusText: Record<Status, string> = {
 	degraded: 'text-degraded',
 	down: 'text-down',
 	pending: 'text-muted',
-	paused: 'text-muted'
+	paused: 'text-muted',
+	maintenance: 'text-accent'
 };
 
-export const overallCopy: Record<Overall, { title: string; tone: Status }> = {
-	operational: { title: 'All systems operational', tone: 'up' },
-	degraded: { title: 'Some systems are degraded', tone: 'degraded' },
-	partial_outage: { title: 'Partial outage', tone: 'down' },
-	major_outage: { title: 'Major outage', tone: 'down' },
-	maintenance: { title: 'Scheduled maintenance in progress', tone: 'paused' }
+export const statusPill: Record<Status, string> = {
+	up: 'text-up bg-up/10 ring-up/25',
+	degraded: 'text-degraded bg-degraded/12 ring-degraded/35',
+	down: 'text-down bg-down/10 ring-down/30',
+	pending: 'text-muted bg-sunken ring-line-strong',
+	paused: 'text-muted bg-sunken ring-line-strong',
+	maintenance: 'text-accent bg-accent/10 ring-accent/30'
+};
+
+export const overallCopy: Record<Overall, { title: string; detail: string; tone: Status }> = {
+	operational: { title: 'All systems operational', detail: 'Every service is responding normally.', tone: 'up' },
+	degraded: { title: 'Degraded performance', detail: 'Some services are slower than usual.', tone: 'degraded' },
+	partial_outage: { title: 'Partial system outage', detail: 'Some services are unavailable.', tone: 'down' },
+	major_outage: { title: 'Major system outage', detail: 'Most services are unavailable.', tone: 'down' },
+	maintenance: { title: 'Scheduled maintenance', detail: 'Planned work is in progress.', tone: 'maintenance' }
 };
 
 export const impactLabel: Record<Impact, string> = {

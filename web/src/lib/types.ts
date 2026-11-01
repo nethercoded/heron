@@ -1,4 +1,30 @@
-export type Status = 'pending' | 'up' | 'degraded' | 'down' | 'paused';
+export type Status = 'pending' | 'up' | 'degraded' | 'down' | 'paused' | 'maintenance';
+export type Repeat = 'none' | 'daily' | 'weekly';
+
+export interface MaintenanceInput {
+	title: string;
+	body: string;
+	monitor_ids: number[];
+	starts_at: string;
+	duration_s: number;
+	repeat: Repeat;
+	enabled: boolean;
+}
+
+export interface MaintenanceWindow {
+	id: number;
+	title: string;
+	body: string;
+	starts_at: string;
+	ends_at: string;
+	duration_s: number;
+	repeat: Repeat;
+	active: boolean;
+	enabled?: boolean;
+	finished?: boolean;
+	monitors: { slug: string; name: string }[];
+	monitor_ids?: number[];
+}
 export type Kind = 'http' | 'tcp' | 'icmp' | 'dns' | 'push';
 export type Overall = 'operational' | 'degraded' | 'partial_outage' | 'major_outage' | 'maintenance';
 export type Impact = 'minor' | 'major' | 'critical' | 'maintenance';
@@ -75,6 +101,7 @@ export interface StatusPage {
 	status: Overall;
 	groups: Group[];
 	incidents: Incident[];
+	maintenance: MaintenanceWindow[];
 	updated_at: string;
 }
 

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nethercode/heron/internal/maintenance"
 	"github.com/nethercode/heron/internal/monitor"
 	"github.com/nethercode/heron/internal/notify"
 )
@@ -251,6 +252,53 @@ func TestSessions(t *testing.T) {
 	}
 	if _, _, err := s.SessionUser(ctx, token); err != nil {
 		t.Errorf("kept session was removed: %v", err)
+	}
+}
+
+func TestMaintenanceWindows(t *testing.T) {
+	s := open(t)
+	ctx := t.Context()
+	db := newMonitor(t, s, "db", monitor.KindTCP)
+	api := newMonitor(t, s, "api", monitor.KindTCP)
+
+	w := &maintenance.Window{
+		Title:      "Upgrade",
+		MonitorIDs: []int64{db.ID, api.ID, db.ID},
+		StartsAt:   time.Date(2026, 11, 8, 3, 0, 0, 0, time.UTC),
+		Duration:   time.Hour,
+		Repeat:     maintenance.RepeatWeekly,
+		Enabled:    true,
+	}
+	if err := s.SaveMaintenanceWindow(ctx, w); err != nil {
+		t.Fatal(err)
+	}
+
+	w.Title = "Weekly upgrade"
+	w.MonitorIDs = []int64{api.ID}
+	if err := s.SaveMaintenanceWindow(ctx, w); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.MaintenanceWindow(ctx, w.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Title != "Weekly upgrade" || len(got.MonitorIDs) != 1 || got.Duration != time.Hour || got.Repeat != maintenance.RepeatWeekly {
+		t.Errorf("window = %+v", got)
+	}
+
+	if err := s.DeleteMonitor(ctx, api.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.MaintenanceWindow(ctx, w.ID); len(got.MonitorIDs) != 0 {
+		t.Errorf("deleted monitor still linked: %v", got.MonitorIDs)
+	}
+
+	if err := s.DeleteMaintenanceWindow(ctx, w.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.MaintenanceWindow(ctx, w.ID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("deleted window found: %v", err)
 	}
 }
 

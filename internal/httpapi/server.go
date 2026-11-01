@@ -107,6 +107,12 @@ func (s *Server) Handler() http.Handler {
 	admin.Handle("DELETE /api/admin/incidents/{id}", s.handle(s.deleteIncident))
 	admin.Handle("POST /api/admin/incidents/{id}/updates", s.handle(s.addIncidentUpdate))
 
+	admin.Handle("GET /api/admin/maintenance", s.handle(s.listMaintenance))
+	admin.Handle("POST /api/admin/maintenance", s.handle(s.createMaintenance))
+	admin.Handle("GET /api/admin/maintenance/{id}", s.handle(s.getMaintenance))
+	admin.Handle("PUT /api/admin/maintenance/{id}", s.handle(s.updateMaintenance))
+	admin.Handle("DELETE /api/admin/maintenance/{id}", s.handle(s.deleteMaintenance))
+
 	admin.Handle("GET /api/admin/page", s.handle(s.getPage))
 	admin.Handle("PUT /api/admin/page", s.handle(s.savePage))
 

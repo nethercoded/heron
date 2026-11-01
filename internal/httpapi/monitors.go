@@ -57,6 +57,7 @@ func (s *Server) createMonitor(w http.ResponseWriter, r *http.Request) error {
 	if err := s.store.CreateMonitor(r.Context(), m); err != nil {
 		return slugConflict(err)
 	}
+	s.engine.Forget(m.ID)
 	s.scheduler.Sync(m)
 	s.engine.Changed(m)
 	s.log.Info("monitor created", "monitor", m.Slug, "kind", m.Kind)
@@ -85,6 +86,7 @@ func (s *Server) updateMonitor(w http.ResponseWriter, r *http.Request) error {
 	if err := s.store.UpdateMonitor(r.Context(), m); err != nil {
 		return slugConflict(err)
 	}
+	s.engine.Forget(m.ID)
 	s.scheduler.Sync(m)
 	s.engine.Changed(m)
 	return ok(w, toAdminMonitor(m))
@@ -95,6 +97,7 @@ func (s *Server) deleteMonitor(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	s.engine.Forget(id)
 	s.scheduler.Stop(id)
 	if err := s.store.DeleteMonitor(r.Context(), id); err != nil {
 		return err
@@ -113,6 +116,7 @@ func (s *Server) pauseMonitor(paused bool) handlerFunc {
 		if err != nil {
 			return err
 		}
+		s.engine.Forget(m.ID)
 		s.scheduler.Sync(m)
 		s.engine.Changed(m)
 		return ok(w, toAdminMonitor(m))
