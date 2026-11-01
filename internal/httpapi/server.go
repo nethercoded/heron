@@ -28,6 +28,7 @@ type Sender interface {
 
 type Options struct {
 	Version        string
+	PublicURL      string
 	Location       *time.Location
 	TrustedProxies []netip.Prefix
 	Assets         fs.FS
@@ -66,8 +67,14 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /healthz", s.handle(s.health))
 
 	mux.Handle("GET /api/status", s.handle(s.status))
+	mux.Handle("GET /api/summary", s.handle(s.summary))
+	mux.Handle("GET /badge", s.handle(s.overallBadge))
+	mux.Handle("GET /badge/{slug}", s.handle(s.statusBadge))
+	mux.Handle("GET /badge/{slug}/uptime", s.handle(s.uptimeBadge))
+	mux.Handle("GET /badge/{slug}/response", s.handle(s.responseBadge))
 	mux.Handle("GET /api/monitors/{slug}", s.handle(s.monitorDetail))
 	mux.Handle("GET /api/monitors/{slug}/series", s.handle(s.monitorSeries))
+	mux.Handle("GET /api/monitors/{slug}/calendar", s.handle(s.monitorCalendar))
 	mux.Handle("GET /api/incidents", s.handle(s.incidents))
 	mux.Handle("GET /api/incidents/{id}", s.handle(s.incident))
 	mux.Handle("GET /api/stream", s.handle(s.stream))
@@ -87,6 +94,7 @@ func (s *Server) Handler() http.Handler {
 	admin.Handle("PUT /api/admin/monitors/order", s.handle(s.reorderMonitors))
 	admin.Handle("GET /api/admin/monitors/{id}", s.handle(s.getMonitor))
 	admin.Handle("GET /api/admin/monitors/{id}/series", s.handle(s.adminSeries))
+	admin.Handle("GET /api/admin/monitors/{id}/calendar", s.handle(s.adminCalendar))
 	admin.Handle("PUT /api/admin/monitors/{id}", s.handle(s.updateMonitor))
 	admin.Handle("DELETE /api/admin/monitors/{id}", s.handle(s.deleteMonitor))
 	admin.Handle("POST /api/admin/monitors/{id}/pause", s.handle(s.pauseMonitor(true)))

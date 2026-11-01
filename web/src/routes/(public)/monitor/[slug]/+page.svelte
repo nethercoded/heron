@@ -8,6 +8,7 @@
 	import RangeTabs from '#lib/components/RangeTabs.svelte';
 	import StatusBadge from '#lib/components/StatusBadge.svelte';
 	import UptimeBar from '#lib/components/UptimeBar.svelte';
+	import UptimeCalendar from '#lib/components/UptimeCalendar.svelte';
 	import { ago, between, latency, percent } from '#lib/format.ts';
 	import { Clock, Live } from '#lib/live.svelte.ts';
 	import { kindLabel } from '#lib/status.ts';
@@ -123,7 +124,12 @@
 
 <section class="card mt-6 p-5">
 	<h2 class="mb-4 font-semibold">Uptime history</h2>
-	<UptimeBar days={m.days} />
+	<UptimeBar days={m.days} uptime={m.uptime.history} />
+</section>
+
+<section class="card mt-6 p-5">
+	<h2 class="mb-4 font-semibold">Uptime calendar</h2>
+	<UptimeCalendar days={data.calendar.days} since={data.calendar.since} />
 </section>
 
 <section class="mt-10">

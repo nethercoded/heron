@@ -49,6 +49,11 @@ export interface Day {
 	degraded: number;
 }
 
+export interface Calendar {
+	since: string;
+	days: Day[];
+}
+
 export interface Uptime {
 	day: number;
 	week: number;

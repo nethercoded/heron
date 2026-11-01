@@ -267,6 +267,36 @@ func (s *Server) adminSeries(w http.ResponseWriter, r *http.Request) error {
 	return s.series(w, r, m)
 }
 
+func (s *Server) monitorCalendar(w http.ResponseWriter, r *http.Request) error {
+	m, err := s.publicMonitor(r)
+	if err != nil {
+		return err
+	}
+	w.Header().Set("Cache-Control", "public, max-age=300")
+	return s.calendar(w, r, m)
+}
+
+func (s *Server) adminCalendar(w http.ResponseWriter, r *http.Request) error {
+	m, err := s.loadMonitor(r)
+	if err != nil {
+		return err
+	}
+	return s.calendar(w, r, m)
+}
+
+func (s *Server) calendar(w http.ResponseWriter, r *http.Request, m *monitor.Monitor) error {
+	const span = 371
+	from := time.Now().In(s.opts.Location).AddDate(0, 0, -(span - 1))
+	days, err := s.store.Days(r.Context(), []int64{m.ID}, from, s.opts.Location)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{
+		"since": m.CreatedAt.In(s.opts.Location).Format(time.DateOnly),
+		"days":  fillDays(days[m.ID], from, span, s.opts.Location),
+	})
+}
+
 func (s *Server) series(w http.ResponseWriter, r *http.Request, m *monitor.Monitor) error {
 	rng, found := seriesRanges[cmp.Or(r.URL.Query().Get("range"), "24h")]
 	if !found {
