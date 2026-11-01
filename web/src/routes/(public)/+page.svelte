@@ -84,7 +84,8 @@
 {:else}
 	{#if overall}
 		<section class="relative isolate overflow-hidden rounded-card bg-surface">
-			<HeronField water={water[overall.tone]} class="absolute inset-0 -z-10 size-full" />
+			<HeronField water={water[overall.tone]} class="absolute inset-0 -z-20 size-full" />
+			<div class="absolute inset-y-0 left-0 -z-10 w-3/4 bg-linear-to-r from-surface via-surface/80 to-transparent sm:w-1/2"></div>
 			<div class="flex min-h-[340px] flex-col justify-between gap-10 p-6 sm:min-h-[380px] sm:p-9">
 				<div class="max-w-md">
 					<p class="flex items-center gap-2.5 font-mono text-xs tracking-wider uppercase" style="color: {color[overall.tone]}">
