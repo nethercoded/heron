@@ -1,0 +1,111 @@
+<script lang="ts">
+	import { untrack } from 'svelte';
+	import { ApiError, api, message } from '#lib/api.ts';
+	import Field from '#lib/components/Field.svelte';
+	import PageHeader from '#lib/components/PageHeader.svelte';
+	import { toast } from '#lib/toast.svelte.ts';
+	import type { Page } from '#lib/types.ts';
+	import { goto } from '$app/navigation';
+	import type { PageProps } from './$types';
+
+	let { data }: PageProps = $props();
+
+	let page = $state<Page>(untrack(() => ({ ...data.page })));
+	let pageFields = $state<Record<string, string>>({});
+	let saving = $state(false);
+
+	let current = $state('');
+	let next = $state('');
+	let repeat = $state('');
+	let passwordFields = $state<Record<string, string>>({});
+
+	async function savePage(event: SubmitEvent) {
+		event.preventDefault();
+		saving = true;
+		pageFields = {};
+		try {
+			page = await api.put<Page>('/admin/page', { ...page, history_days: Number(page.history_days) });
+			toast.success('Status page updated');
+		} catch (err) {
+			if (err instanceof ApiError) pageFields = err.fields;
+			toast.error(message(err));
+		} finally {
+			saving = false;
+		}
+	}
+
+	async function changePassword(event: SubmitEvent) {
+		event.preventDefault();
+		passwordFields = {};
+		if (next !== repeat) {
+			passwordFields = { repeat: 'Passwords do not match' };
+			return;
+		}
+		try {
+			await api.put('/admin/account/password', { current, next });
+			current = next = repeat = '';
+			toast.success('Password changed, other sessions were signed out');
+		} catch (err) {
+			if (err instanceof ApiError) passwordFields = err.fields;
+			if (err instanceof ApiError && err.status === 401) await goto('/admin/login');
+			else toast.error(message(err));
+		}
+	}
+</script>
+
+<PageHeader title="Settings" />
+
+<div class="space-y-6">
+	<form class="card p-5 sm:p-6" onsubmit={savePage} novalidate>
+		<h2 class="font-semibold">Status page</h2>
+		<p class="mb-5 text-sm text-muted">How the public page looks to your users.</p>
+
+		<div class="grid gap-4 sm:grid-cols-2">
+			<Field label="Title" id="title" error={pageFields.title}>
+				<input id="title" class="input" bind:value={page.title} aria-invalid={!!pageFields.title} />
+			</Field>
+			<Field label="History" id="history" hint="Days shown in uptime bars" error={pageFields.history_days}>
+				<select id="history" class="input-select" bind:value={page.history_days}>
+					{#each [30, 60, 90, 180, 365] as days (days)}<option value={days}>{days} days</option>{/each}
+				</select>
+			</Field>
+			<Field label="Description" id="description" class="sm:col-span-2">
+				<input id="description" class="input" placeholder="Live status of our services" bind:value={page.description} />
+			</Field>
+			<Field label="Logo URL" id="logo" error={pageFields.logo_url}>
+				<input id="logo" class="input" placeholder="https://example.com/logo.svg" bind:value={page.logo_url} aria-invalid={!!pageFields.logo_url} />
+			</Field>
+			<Field label="Website" id="home" hint="Where the logo links to" error={pageFields.home_url}>
+				<input id="home" class="input" placeholder="https://example.com" bind:value={page.home_url} aria-invalid={!!pageFields.home_url} />
+			</Field>
+			<Field label="Footer" id="footer" class="sm:col-span-2">
+				<input id="footer" class="input" bind:value={page.footer} />
+			</Field>
+		</div>
+
+		<div class="mt-6 flex justify-end">
+			<button class="btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+		</div>
+	</form>
+
+	<form class="card p-5 sm:p-6" onsubmit={changePassword} novalidate>
+		<h2 class="font-semibold">Password</h2>
+		<p class="mb-5 text-sm text-muted">Changing it signs out every other session.</p>
+
+		<div class="grid gap-4 sm:grid-cols-3">
+			<Field label="Current password" id="current" error={passwordFields.current}>
+				<input id="current" type="password" class="input" autocomplete="current-password" bind:value={current} aria-invalid={!!passwordFields.current} />
+			</Field>
+			<Field label="New password" id="next" error={passwordFields.next}>
+				<input id="next" type="password" class="input" autocomplete="new-password" bind:value={next} aria-invalid={!!passwordFields.next} />
+			</Field>
+			<Field label="Repeat" id="repeat" error={passwordFields.repeat}>
+				<input id="repeat" type="password" class="input" autocomplete="new-password" bind:value={repeat} aria-invalid={!!passwordFields.repeat} />
+			</Field>
+		</div>
+
+		<div class="mt-6 flex justify-end">
+			<button class="btn-secondary">Change password</button>
+		</div>
+	</form>
+</div>

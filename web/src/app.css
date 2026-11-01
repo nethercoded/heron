@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+	--font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	--font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+	--color-canvas: oklch(98.5% 0.003 250);
+	--color-surface: oklch(100% 0 0);
+	--color-sunken: oklch(96.5% 0.005 250);
+	--color-line: oklch(91.5% 0.008 250);
+	--color-ink: oklch(22% 0.02 260);
+	--color-muted: oklch(52% 0.02 260);
+	--color-faint: oklch(68% 0.015 260);
+
+	--color-accent: oklch(62% 0.15 235);
+	--color-up: oklch(66% 0.16 152);
+	--color-degraded: oklch(76% 0.15 75);
+	--color-down: oklch(60% 0.21 25);
+	--color-pending: oklch(84% 0.01 260);
+	--color-paused: oklch(70% 0.03 260);
+
+	--radius-card: 0.875rem;
+	--shadow-card: 0 1px 2px oklch(0% 0 0 / 0.04), 0 1px 1px oklch(0% 0 0 / 0.02);
+
+	--animate-pulse-ring: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+	@keyframes pulse-ring {
+		0% {
+			transform: scale(1);
+			opacity: 0.6;
+		}
+		80%,
+		100% {
+			transform: scale(2.4);
+			opacity: 0;
+		}
+	}
+}
+
+@layer base {
+	.dark {
+		--color-canvas: oklch(17% 0.012 260);
+		--color-surface: oklch(21% 0.014 260);
+		--color-sunken: oklch(19% 0.012 260);
+		--color-line: oklch(29% 0.015 260);
+		--color-ink: oklch(94% 0.005 260);
+		--color-muted: oklch(70% 0.015 260);
+		--color-faint: oklch(55% 0.015 260);
+		--color-pending: oklch(36% 0.015 260);
+		--color-paused: oklch(48% 0.02 260);
+		--shadow-card: 0 1px 2px oklch(0% 0 0 / 0.3);
+	}
+
+	html {
+		@apply bg-canvas text-ink antialiased;
+		font-feature-settings: "cv11", "ss01";
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	::selection {
+		@apply bg-accent/25;
+	}
+
+	:focus-visible {
+		@apply outline-2 outline-offset-2 outline-accent;
+	}
+}
+
+@utility card {
+	@apply rounded-card border border-line bg-surface shadow-card;
+}
+
+@utility btn {
+	@apply inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3.5 text-sm font-medium whitespace-nowrap transition select-none disabled:pointer-events-none disabled:opacity-50;
+}
+
+@utility btn-primary {
+	@apply btn bg-ink text-canvas hover:bg-ink/85;
+}
+
+@utility btn-secondary {
+	@apply btn border border-line bg-surface text-ink hover:bg-sunken;
+}
+
+@utility btn-ghost {
+	@apply btn text-muted hover:bg-sunken hover:text-ink;
+}
+
+@utility btn-danger {
+	@apply btn border border-down/30 text-down hover:bg-down/10;
+}
+
+@utility btn-sm {
+	@apply h-8 px-2.5 text-[13px];
+}
+
+@utility input {
+	@apply h-9 w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink transition placeholder:text-faint focus:border-accent focus:ring-3 focus:ring-accent/15 focus:outline-none aria-invalid:border-down aria-invalid:ring-down/15;
+}
+
+@utility input-area {
+	@apply input font-mono text-[13px] leading-relaxed;
+	height: auto;
+	min-height: 5rem;
+	padding-block: 0.5rem;
+}
+
+@utility input-select {
+	@apply input;
+	appearance: none;
+	padding-right: 2rem;
+	background:
+		var(--color-surface)
+		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")
+		no-repeat right 0.5rem center / 1.25rem;
+}
+
+@utility label {
+	@apply mb-1.5 block text-[13px] font-medium text-ink;
+}
+
+@utility hint {
+	@apply mt-1.5 text-xs text-muted;
+}
+
+@utility chip {
+	@apply inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset;
+}
+
+@utility kbd {
+	@apply rounded border border-line bg-sunken px-1.5 py-0.5 font-mono text-xs;
+}
