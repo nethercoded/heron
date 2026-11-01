@@ -1,63 +1,75 @@
 <script lang="ts">
-	import { ago, between, formatDateTime } from '#lib/format.ts';
+	import { between, formatDateTime } from '#lib/format.ts';
 	import { impactLabel, impactTone, incidentStatusLabel } from '#lib/status.ts';
-	import type { Incident } from '#lib/types.ts';
+	import type { Impact, Incident } from '#lib/types.ts';
 	import Icon from './Icon.svelte';
 
 	let { incident, href, expanded = false }: { incident: Incident; href?: string; expanded?: boolean } = $props();
 
 	const open = $derived(!incident.resolved_at);
-	const updates = $derived(expanded ? incident.updates : incident.updates.slice(0, 1));
+	const updates = $derived(expanded ? incident.updates : incident.updates.slice(0, 2));
+	const stripe: Record<Impact, string> = {
+		minor: 'bg-degraded',
+		major: 'bg-down',
+		critical: 'bg-down',
+		maintenance: 'bg-accent'
+	};
 </script>
 
-<article class="card overflow-hidden">
-	<header class="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4 {open ? 'bg-sunken/60' : ''}">
+<article class="card relative overflow-hidden">
+	<span class="absolute inset-y-0 left-0 w-1 {open ? stripe[incident.impact] : 'bg-up'}"></span>
+
+	<header class="flex flex-wrap items-start justify-between gap-3 border-b border-line py-4 pr-5 pl-6">
 		<div class="min-w-0">
-			<h3 class="font-semibold text-ink">
+			<h3 class="text-[15px] font-semibold text-ink">
 				{#if href}
-					<a {href} class="hover:underline">{incident.title}</a>
+					<a {href} class="hover:text-accent">{incident.title}</a>
 				{:else}
 					{incident.title}
 				{/if}
 			</h3>
 			<p class="mt-1 text-xs text-muted">
-				{formatDateTime(incident.started_at)}
+				Started {formatDateTime(incident.started_at)}
 				{#if incident.resolved_at}
-					· resolved after {between(incident.started_at, incident.resolved_at)}
+					· Resolved in {between(incident.started_at, incident.resolved_at)}
 				{:else}
-					· ongoing for {between(incident.started_at)}
+					· Ongoing for {between(incident.started_at)}
 				{/if}
 			</p>
 		</div>
 		<div class="flex items-center gap-2">
 			<span class="chip {impactTone[incident.impact]}">{impactLabel[incident.impact]}</span>
-			<span class="chip {open ? 'text-ink ring-line' : 'text-up ring-up/30 bg-up/10'}">
-				{#if !open}<Icon name="check" size={12} />{/if}
+			<span class="chip {open ? 'text-ink ring-line-strong' : 'bg-up/10 text-up ring-up/25'}">
+				{#if !open}<Icon name="check" size={11} />{/if}
 				{incidentStatusLabel[incident.status]}
 			</span>
 		</div>
 	</header>
 
-	<ol class="space-y-4 px-5 py-4">
-		{#each updates as update (update.id)}
-			<li class="relative pl-5">
-				<span class="absolute top-1.5 left-0 size-2 rounded-full {update.status === 'resolved' ? 'bg-up' : 'bg-faint'}"></span>
-				<p class="text-sm">
-					<span class="font-medium text-ink">{incidentStatusLabel[update.status]}</span>
-					<span class="text-muted">— {update.body}</span>
-				</p>
-				<time class="mt-0.5 block text-xs text-faint" datetime={update.created_at} title={formatDateTime(update.created_at)}>
-					{ago(update.created_at)}
-				</time>
+	<ol class="py-1 pr-5 pl-6">
+		{#each updates as update, i (update.id)}
+			<li class="grid gap-x-6 py-3 sm:grid-cols-[8.5rem_1fr] {i > 0 ? 'border-t border-line' : ''}">
+				<div>
+					<p class="text-[13px] font-semibold {update.status === 'resolved' ? 'text-up' : 'text-ink'}">{incidentStatusLabel[update.status]}</p>
+					<time class="text-xs text-faint" datetime={update.created_at}>{formatDateTime(update.created_at)}</time>
+				</div>
+				<p class="mt-1 leading-relaxed text-muted sm:mt-0">{update.body}</p>
 			</li>
 		{/each}
+		{#if !expanded && incident.updates.length > updates.length && href}
+			<li class="border-t border-line py-2.5">
+				<a {href} class="text-xs font-medium text-accent hover:underline">
+					View {incident.updates.length - updates.length} earlier {incident.updates.length - updates.length === 1 ? 'update' : 'updates'}
+				</a>
+			</li>
+		{/if}
 	</ol>
 
 	{#if incident.monitors.length > 0}
-		<footer class="flex flex-wrap items-center gap-1.5 border-t border-line px-5 py-3 text-xs text-muted">
-			Affected:
+		<footer class="flex flex-wrap items-center gap-1.5 border-t border-line bg-sunken/60 py-2.5 pr-5 pl-6 text-xs text-muted">
+			<span class="mr-1">Affected services</span>
 			{#each incident.monitors as m (m.slug)}
-				<a href="/monitor/{m.slug}" class="rounded-md bg-sunken px-1.5 py-0.5 text-ink hover:bg-line">{m.name}</a>
+				<a href="/monitor/{m.slug}" class="rounded border border-line bg-surface px-1.5 py-0.5 font-medium text-ink hover:border-line-strong">{m.name}</a>
 			{/each}
 		</footer>
 	{/if}

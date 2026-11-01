@@ -21,11 +21,11 @@
 	</a>
 {/if}
 
-<div class="mb-8 flex flex-wrap items-end justify-between gap-4">
+<div class="mb-6 flex flex-wrap items-end justify-between gap-4">
 	<div class="min-w-0">
-		<h1 class="text-2xl font-semibold tracking-tight">{title}</h1>
+		<h1 class="text-xl font-semibold tracking-tight">{title}</h1>
 		{#if description}
-			<p class="mt-1 text-sm text-muted">{description}</p>
+			<p class="mt-1 text-muted">{description}</p>
 		{/if}
 	</div>
 	{#if actions}
