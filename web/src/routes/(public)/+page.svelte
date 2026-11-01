@@ -52,7 +52,7 @@
 	const healthy = $derived(monitors.filter((m) => m.status === 'up' || m.status === 'degraded').length);
 	const historyDays = $derived(monitors[0]?.days.length ?? data?.page.history_days ?? 90);
 	const uptimeDigits = $derived(
-		average == null ? '--.--' : (Math.floor(Math.min(average, 0.9999) * 10000) / 100).toFixed(2)
+		average == null ? '--.--' : average >= 1 ? '100' : (Math.floor(average * 10000) / 100).toFixed(2)
 	);
 
 	function worst(group: Group): Status {
