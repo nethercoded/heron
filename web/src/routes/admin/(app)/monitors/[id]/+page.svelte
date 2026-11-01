@@ -9,7 +9,7 @@
 	import StatusBadge from '#lib/components/StatusBadge.svelte';
 	import UptimeCalendar from '#lib/components/UptimeCalendar.svelte';
 	import { badgeMarkdown } from '#lib/embed.ts';
-	import { ago, between, formatDateTime, interval, latency } from '#lib/format.ts';
+	import { ago, between, displayTarget, formatDateTime, interval, latency } from '#lib/format.ts';
 	import { Clock, Live } from '#lib/live.svelte.ts';
 	import { kindLabel, statusLabel, statusText } from '#lib/status.ts';
 	import { toast } from '#lib/toast.svelte.ts';
@@ -99,7 +99,7 @@
 	]);
 </script>
 
-<PageHeader title={m.name} description={m.kind === 'push' ? 'Push monitor' : m.target} back={{ href: '/admin', label: 'Monitors' }}>
+<PageHeader title={m.name} description={m.kind === 'push' ? 'Push monitor' : displayTarget(m.target)} back={{ href: '/admin', label: 'Monitors' }}>
 	{#snippet actions()}
 		{#if m.kind !== 'push' && !m.paused}
 			<button class="btn-secondary" disabled={busy} onclick={() => action('Check scheduled', `/admin/monitors/${m.id}/check`)}>

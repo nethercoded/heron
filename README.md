@@ -21,9 +21,11 @@ heron watches your websites, APIs, servers and cron jobs, keeps the history, and
 
 ## Features
 
-- **Checks**: HTTP(S) with status codes, keywords, headers, body and TLS certificate expiry; TCP ports; ICMP ping; DNS records; push heartbeats for cron jobs and backups
-- **Public page** with 90-day uptime bars, response time charts, incident history and live updates over Server-Sent Events
-- **Incidents** opened and resolved automatically, plus manual incidents and maintenance notes with a timeline of updates
+- **Checks**: HTTP(S) with status codes, keywords, headers, body and TLS certificate expiry; TCP; ICMP ping; DNS records; gRPC health; Postgres (runs a real query); Redis; SMTP with STARTTLS; IMAP; Docker container state and healthchecks; Minecraft and Steam game servers with player counts; push heartbeats for cron jobs and backups
+- **Public page** with 90-day uptime bars, a year-long uptime calendar, response time charts, incident history and live updates over Server-Sent Events
+- **Incidents** opened and resolved automatically, plus manual incidents with a timeline of updates
+- **Maintenance windows**, one-off or repeating daily or weekly, that mute alerts and show up on the status page a week in advance
+- **Badges and a widget**: SVG status, uptime and response time badges for READMEs, and a drop-in script that shows a notice on your own site during incidents
 - **Alerts** to Telegram (including forum topics) and signed webhooks, with retries and backoff
 - **Admin panel** for monitors, incidents, notification channels and page settings
 - Retries before alerting, degraded thresholds for slow responses, private monitors, groups
@@ -110,6 +112,28 @@ If no heartbeat arrives within the interval plus the grace period, the monitor g
 /api/push/<token>?status=down&msg=disk%20full
 /api/push/<token>?status=up&ping=532
 ```
+
+## Badges and widget
+
+```markdown
+[![Status](https://status.example.com/badge)](https://status.example.com)
+[![API](https://status.example.com/badge/api)](https://status.example.com/monitor/api)
+[![Uptime](https://status.example.com/badge/api/uptime?period=30d)](https://status.example.com/monitor/api)
+```
+
+Add `?label=` to change the left side. Response time lives at `/badge/<slug>/response`.
+
+The widget stays invisible while everything is fine and shows a small card when there is an active incident or maintenance:
+
+```html
+<script src="https://status.example.com/widget.js" data-position="bottom-right" async></script>
+```
+
+Options: `data-position` (`bottom-right`, `bottom-left`, `top-right`, `top-left`), `data-upcoming="true"` to announce planned work in advance, `data-refresh` in seconds. It reads `/api/summary`, which is safe to call cross-origin.
+
+## Docker monitors
+
+Docker checks talk to the Docker API, `unix:///var/run/docker.sock` by default. Give heron read access by adding its user to the `docker` group, or put a read-only socket proxy in front and set the monitor's Docker host to `tcp://proxy:2375`.
 
 ## Webhooks
 

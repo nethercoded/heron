@@ -83,8 +83,8 @@ func telegramText(msg Message) string {
 		fmt.Fprintf(&b, "🔔 <b>Test notification from heron</b>\n")
 	}
 
-	if msg.Monitor != nil && msg.Monitor.Target != "" {
-		fmt.Fprintf(&b, "<code>%s</code>\n", esc(msg.Monitor.Target))
+	if msg.Monitor != nil && msg.Monitor.DisplayTarget() != "" {
+		fmt.Fprintf(&b, "<code>%s</code>\n", esc(msg.Monitor.DisplayTarget()))
 	}
 	if msg.Reason != "" {
 		fmt.Fprintf(&b, "\n%s\n", esc(msg.Reason))

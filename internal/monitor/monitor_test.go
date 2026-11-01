@@ -148,7 +148,7 @@ func TestValidate(t *testing.T) {
 		{name: "dns ip target", mon: Monitor{Name: "x", Kind: KindDNS, Target: "1.1.1.1"}, fields: []string{"target"}},
 		{name: "interval too short", mon: Monitor{Name: "x", Kind: KindTCP, Target: "db:1", Interval: time.Second}, fields: []string{"interval"}},
 		{name: "timeout above interval", mon: Monitor{Name: "x", Kind: KindTCP, Target: "db:1", Interval: time.Minute, Timeout: 2 * time.Minute}, fields: []string{"timeout"}},
-		{name: "unknown kind", mon: Monitor{Name: "x", Kind: "smtp"}, fields: []string{"kind"}},
+		{name: "unknown kind", mon: Monitor{Name: "x", Kind: "ftp"}, fields: []string{"kind"}},
 	}
 
 	for _, tt := range tests {

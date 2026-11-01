@@ -3,7 +3,7 @@
 	import Icon from '#lib/components/Icon.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import StatusBadge from '#lib/components/StatusBadge.svelte';
-	import { ago, interval, latency, percent } from '#lib/format.ts';
+	import { ago, displayTarget, interval, latency, percent } from '#lib/format.ts';
 	import { Clock, debounce, Live } from '#lib/live.svelte.ts';
 	import { kindLabel, statusLabel } from '#lib/status.ts';
 	import type { AdminMonitor, Status } from '#lib/types.ts';
@@ -152,7 +152,7 @@
 										{/if}
 									</span>
 									<span class="block max-w-[22rem] truncate font-mono text-xs text-muted">
-										{m.kind === 'push' ? `heartbeat · every ${interval(m.interval_s)}` : m.target}
+										{m.kind === 'push' ? `heartbeat · every ${interval(m.interval_s)}` : displayTarget(m.target)}
 									</span>
 								</a>
 							</td>

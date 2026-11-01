@@ -10,10 +10,18 @@ type Registry map[Kind]Checker
 
 func NewRegistry(userAgent string, privilegedICMP bool) Registry {
 	return Registry{
-		KindHTTP: NewHTTPChecker(userAgent),
-		KindTCP:  TCPChecker{},
-		KindICMP: ICMPChecker{Privileged: privilegedICMP},
-		KindDNS:  DNSChecker{},
+		KindHTTP:      NewHTTPChecker(userAgent),
+		KindTCP:       TCPChecker{},
+		KindICMP:      ICMPChecker{Privileged: privilegedICMP},
+		KindDNS:       DNSChecker{},
+		KindRedis:     RedisChecker{},
+		KindPostgres:  PostgresChecker{},
+		KindSMTP:      SMTPChecker{},
+		KindIMAP:      IMAPChecker{},
+		KindDocker:    DockerChecker{},
+		KindGRPC:      GRPCChecker{},
+		KindMinecraft: MinecraftChecker{},
+		KindSteam:     SteamChecker{},
 	}
 }
 

@@ -70,7 +70,15 @@ export const kindLabel: Record<Kind, string> = {
 	tcp: 'TCP',
 	icmp: 'Ping',
 	dns: 'DNS',
-	push: 'Push'
+	push: 'Push',
+	redis: 'Redis',
+	postgres: 'Postgres',
+	smtp: 'SMTP',
+	imap: 'IMAP',
+	docker: 'Docker',
+	grpc: 'gRPC',
+	minecraft: 'Minecraft',
+	steam: 'Steam'
 };
 
 export function dayTone(uptime: number | null, degraded = 0) {

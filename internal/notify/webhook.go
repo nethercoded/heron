@@ -55,7 +55,7 @@ func (w *Webhook) Notify(ctx context.Context, msg Message) error {
 		Link:     msg.Link,
 	}
 	if m := msg.Monitor; m != nil {
-		payload.Monitor = &webhookTarget{ID: m.ID, Slug: m.Slug, Name: m.Name, Kind: string(m.Kind), Target: m.Target}
+		payload.Monitor = &webhookTarget{ID: m.ID, Slug: m.Slug, Name: m.Name, Kind: string(m.Kind), Target: m.DisplayTarget()}
 	}
 
 	body, err := json.Marshal(payload)

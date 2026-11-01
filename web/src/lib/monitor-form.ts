@@ -13,20 +13,55 @@ export const intervals = [
 	{ value: 86400, label: '1 day' }
 ];
 
-export const kinds: { value: Kind; label: string; hint: string }[] = [
-	{ value: 'http', label: 'HTTP', hint: 'Websites and APIs' },
-	{ value: 'tcp', label: 'TCP', hint: 'Any open port' },
-	{ value: 'icmp', label: 'Ping', hint: 'Host reachability' },
-	{ value: 'dns', label: 'DNS', hint: 'Record resolution' },
-	{ value: 'push', label: 'Push', hint: 'Cron jobs, backups' }
+export const kindGroups: { label: string; kinds: { value: Kind; label: string; hint: string }[] }[] = [
+	{
+		label: 'Network',
+		kinds: [
+			{ value: 'http', label: 'HTTP', hint: 'Websites and APIs' },
+			{ value: 'tcp', label: 'TCP', hint: 'Any open port' },
+			{ value: 'icmp', label: 'Ping', hint: 'Host reachability' },
+			{ value: 'dns', label: 'DNS', hint: 'Record resolution' },
+			{ value: 'grpc', label: 'gRPC', hint: 'Health protocol' }
+		]
+	},
+	{
+		label: 'Services',
+		kinds: [
+			{ value: 'postgres', label: 'Postgres', hint: 'Runs a query' },
+			{ value: 'redis', label: 'Redis', hint: 'AUTH and PING' },
+			{ value: 'smtp', label: 'SMTP', hint: 'Mail delivery' },
+			{ value: 'imap', label: 'IMAP', hint: 'Mailbox access' },
+			{ value: 'docker', label: 'Docker', hint: 'Container health' }
+		]
+	},
+	{
+		label: 'Games and jobs',
+		kinds: [
+			{ value: 'minecraft', label: 'Minecraft', hint: 'Java server ping' },
+			{ value: 'steam', label: 'Steam', hint: 'Source query' },
+			{ value: 'push', label: 'Push', hint: 'Cron jobs, backups' }
+		]
+	}
 ];
 
-export const targetCopy: Record<Kind, { label: string; placeholder: string }> = {
+export const targetCopy: Record<Kind, { label: string; placeholder: string; hint?: string }> = {
 	http: { label: 'URL', placeholder: 'https://example.com/health' },
 	tcp: { label: 'Host and port', placeholder: 'db.internal:5432' },
 	icmp: { label: 'Host', placeholder: '203.0.113.10' },
 	dns: { label: 'Domain', placeholder: 'example.com' },
-	push: { label: '', placeholder: '' }
+	push: { label: '', placeholder: '' },
+	grpc: { label: 'Host and port', placeholder: 'api.internal:50051' },
+	postgres: {
+		label: 'Connection URL',
+		placeholder: 'postgres://heron:secret@db.internal:5432/app?sslmode=disable',
+		hint: 'Use a read-only role. The password is never shown in alerts.'
+	},
+	redis: { label: 'Host and port', placeholder: 'cache.internal:6379', hint: 'Port defaults to 6379' },
+	smtp: { label: 'Host and port', placeholder: 'mail.example.com:587', hint: 'Port defaults to 25, or 465 with TLS' },
+	imap: { label: 'Host and port', placeholder: 'mail.example.com', hint: 'Port defaults to 143, or 993 with TLS' },
+	docker: { label: 'Container', placeholder: 'web-1', hint: 'Name or id of the container' },
+	minecraft: { label: 'Server address', placeholder: 'play.example.com', hint: 'Port defaults to 25565' },
+	steam: { label: 'Server address', placeholder: '203.0.113.10:27015', hint: 'Query port, defaults to 27015' }
 };
 
 export function blank(): MonitorInput {

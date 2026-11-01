@@ -25,7 +25,20 @@ export interface MaintenanceWindow {
 	monitors: { slug: string; name: string }[];
 	monitor_ids?: number[];
 }
-export type Kind = 'http' | 'tcp' | 'icmp' | 'dns' | 'push';
+export type Kind =
+	| 'http'
+	| 'tcp'
+	| 'icmp'
+	| 'dns'
+	| 'push'
+	| 'redis'
+	| 'postgres'
+	| 'smtp'
+	| 'imap'
+	| 'docker'
+	| 'grpc'
+	| 'minecraft'
+	| 'steam';
 export type Overall = 'operational' | 'degraded' | 'partial_outage' | 'major_outage' | 'maintenance';
 export type Impact = 'minor' | 'major' | 'critical' | 'maintenance';
 export type IncidentStatus = 'investigating' | 'identified' | 'monitoring' | 'resolved';
@@ -152,6 +165,12 @@ export interface Settings {
 	expect?: string;
 	packets?: number;
 	grace_seconds?: number;
+	password?: string;
+	tls?: boolean;
+	starttls?: boolean;
+	service?: string;
+	docker_host?: string;
+	min_players?: number;
 }
 
 export interface MonitorInput {

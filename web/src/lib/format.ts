@@ -53,6 +53,10 @@ export function latency(ms: number | undefined) {
 	return ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${Math.round(ms)} ms`;
 }
 
+export function displayTarget(target: string) {
+	return target.replace(/^(\w+:\/\/[^:@/]+):[^@]*@/, '$1:***@');
+}
+
 export function interval(seconds: number) {
 	if (seconds % 86_400 === 0) return `${seconds / 86_400}d`;
 	if (seconds % 3_600 === 0) return `${seconds / 3_600}h`;

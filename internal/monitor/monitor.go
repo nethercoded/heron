@@ -16,14 +16,34 @@ import (
 type Kind string
 
 const (
-	KindHTTP Kind = "http"
-	KindTCP  Kind = "tcp"
-	KindICMP Kind = "icmp"
-	KindDNS  Kind = "dns"
-	KindPush Kind = "push"
+	KindHTTP      Kind = "http"
+	KindTCP       Kind = "tcp"
+	KindICMP      Kind = "icmp"
+	KindDNS       Kind = "dns"
+	KindPush      Kind = "push"
+	KindRedis     Kind = "redis"
+	KindPostgres  Kind = "postgres"
+	KindSMTP      Kind = "smtp"
+	KindIMAP      Kind = "imap"
+	KindDocker    Kind = "docker"
+	KindGRPC      Kind = "grpc"
+	KindMinecraft Kind = "minecraft"
+	KindSteam     Kind = "steam"
 )
 
-var Kinds = []Kind{KindHTTP, KindTCP, KindICMP, KindDNS, KindPush}
+var Kinds = []Kind{
+	KindHTTP, KindTCP, KindICMP, KindDNS, KindPush,
+	KindRedis, KindPostgres, KindSMTP, KindIMAP, KindDocker, KindGRPC, KindMinecraft, KindSteam,
+}
+
+var defaultPorts = map[Kind]string{
+	KindRedis:     "6379",
+	KindSMTP:      "25",
+	KindIMAP:      "143",
+	KindGRPC:      "50051",
+	KindMinecraft: "25565",
+	KindSteam:     "27015",
+}
 
 type Status string
 
@@ -86,6 +106,23 @@ type Settings struct {
 	Expect          string            `json:"expect,omitzero"`
 	Packets         int               `json:"packets,omitzero"`
 	GraceSeconds    int               `json:"grace_seconds,omitzero"`
+	Password        string            `json:"password,omitzero"`
+	TLS             bool              `json:"tls,omitzero"`
+	StartTLS        bool              `json:"starttls,omitzero"`
+	Service         string            `json:"service,omitzero"`
+	DockerHost      string            `json:"docker_host,omitzero"`
+	MinPlayers      int               `json:"min_players,omitzero"`
+}
+
+func (m *Monitor) DisplayTarget() string {
+	if m.Kind != KindPostgres {
+		return m.Target
+	}
+	u, err := url.Parse(m.Target)
+	if err != nil {
+		return m.Target
+	}
+	return u.Redacted()
 }
 
 type Result struct {
@@ -132,9 +169,10 @@ const (
 )
 
 var (
-	slugPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
-	recordTypes = []string{"A", "AAAA", "CNAME", "MX", "NS", "TXT"}
-	methods     = []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+	slugPattern      = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
+	containerPattern = regexp.MustCompile(`^/?[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$`)
+	recordTypes      = []string{"A", "AAAA", "CNAME", "MX", "NS", "TXT"}
+	methods          = []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
 )
 
 type FieldError struct {
@@ -184,6 +222,20 @@ func (m *Monitor) Normalize() {
 		if s.GraceSeconds == 0 {
 			s.GraceSeconds = int(m.Interval.Seconds() / 2)
 		}
+	case KindDocker:
+		s.DockerHost = cmp.Or(s.DockerHost, "unix:///var/run/docker.sock")
+	}
+
+	if port, ok := defaultPorts[m.Kind]; ok && m.Target != "" {
+		if _, _, err := net.SplitHostPort(m.Target); err != nil {
+			if m.Kind == KindIMAP && s.TLS {
+				port = "993"
+			}
+			if m.Kind == KindSMTP && s.TLS {
+				port = "465"
+			}
+			m.Target = net.JoinHostPort(strings.Trim(m.Target, "[]"), port)
+		}
 	}
 }
 
@@ -215,9 +267,24 @@ func (m *Monitor) Validate() error {
 	switch m.Kind {
 	case KindHTTP:
 		errs = append(errs, m.validateHTTP()...)
-	case KindTCP:
-		if _, _, err := net.SplitHostPort(m.Target); err != nil {
+	case KindTCP, KindRedis, KindSMTP, KindIMAP, KindGRPC, KindMinecraft, KindSteam:
+		if host, _, err := net.SplitHostPort(m.Target); err != nil || host == "" {
 			errs = append(errs, fieldErr("target", "must be host:port"))
+		}
+		if m.Settings.MinPlayers < 0 {
+			errs = append(errs, fieldErr("min_players", "must not be negative"))
+		}
+	case KindPostgres:
+		u, err := url.Parse(m.Target)
+		if err != nil || (u.Scheme != "postgres" && u.Scheme != "postgresql") || u.Host == "" {
+			errs = append(errs, fieldErr("target", "must be a postgres:// connection url"))
+		}
+	case KindDocker:
+		if !containerPattern.MatchString(m.Target) {
+			errs = append(errs, fieldErr("target", "must be a container name or id"))
+		}
+		if h := m.Settings.DockerHost; !strings.HasPrefix(h, "unix://") && !strings.HasPrefix(h, "tcp://") {
+			errs = append(errs, fieldErr("docker_host", "must start with unix:// or tcp://"))
 		}
 	case KindICMP:
 		if !validHost(m.Target) {

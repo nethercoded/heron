@@ -1,7 +1,15 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { ApiError, message } from '#lib/api.ts';
-	import { formatHeaders, intervals, kinds, parseCodes, parseHeaders, slugify, targetCopy } from '#lib/monitor-form.ts';
+	import {
+		formatHeaders,
+		intervals,
+		kindGroups,
+		parseCodes,
+		parseHeaders,
+		slugify,
+		targetCopy
+	} from '#lib/monitor-form.ts';
 	import { toast } from '#lib/toast.svelte.ts';
 	import type { Channel, MonitorInput } from '#lib/types.ts';
 	import Field from './Field.svelte';
@@ -76,17 +84,24 @@
 		<h2 class="mb-1 font-semibold">What should heron check?</h2>
 		<p class="mb-5 text-sm text-muted">Pick a check type. You can change it later.</p>
 
-		<div class="grid grid-cols-2 gap-2 sm:grid-cols-5" role="radiogroup" aria-label="Check type">
-			{#each kinds as k (k.value)}
-				<label
-					class="cursor-pointer rounded-lg border px-3 py-2.5 transition {form.kind === k.value
-						? 'border-ink bg-sunken'
-						: 'border-line hover:border-faint'}"
-				>
-					<input type="radio" name="kind" value={k.value} bind:group={form.kind} class="sr-only" />
-					<span class="block text-sm font-medium">{k.label}</span>
-					<span class="block text-xs text-muted">{k.hint}</span>
-				</label>
+		<div class="space-y-4" role="radiogroup" aria-label="Check type">
+			{#each kindGroups as group (group.label)}
+				<div>
+					<p class="mb-2 text-[11px] font-semibold tracking-wider text-muted uppercase">{group.label}</p>
+					<div class="grid grid-cols-2 gap-2 sm:grid-cols-5">
+						{#each group.kinds as k (k.value)}
+							<label
+								class="cursor-pointer rounded-lg border px-3 py-2.5 transition {form.kind === k.value
+									? 'border-accent bg-accent/5 ring-1 ring-accent'
+									: 'border-line hover:border-line-strong'}"
+							>
+								<input type="radio" name="kind" value={k.value} bind:group={form.kind} class="sr-only" />
+								<span class="block text-sm font-medium">{k.label}</span>
+								<span class="block text-xs text-muted">{k.hint}</span>
+							</label>
+						{/each}
+					</div>
+				</div>
 			{/each}
 		</div>
 
@@ -99,7 +114,7 @@
 			</Field>
 
 			{#if form.kind !== 'push'}
-				<Field label={target.label} id="target" error={fields.target} class="sm:col-span-2">
+				<Field label={target.label} id="target" hint={target.hint} error={fields.target} class="sm:col-span-2">
 					<input id="target" class="input font-mono" placeholder={target.placeholder} bind:value={form.target} aria-invalid={!!fields.target} />
 				</Field>
 			{/if}
@@ -182,6 +197,50 @@
 					<Toggle label="Must be absent" bind:checked={form.settings.keyword_absent} />
 				</div>
 			</div>
+		</section>
+	{/if}
+
+	{#if ['redis', 'smtp', 'imap', 'grpc', 'docker', 'minecraft', 'steam'].includes(form.kind)}
+		<section class="card p-5 sm:p-6">
+			<h2 class="mb-5 font-semibold">Connection</h2>
+			<div class="grid gap-4 sm:grid-cols-3">
+				{#if form.kind === 'redis'}
+					<Field label="Password" id="password" hint="Sent with AUTH, leave empty if none">
+						<input id="password" type="password" autocomplete="off" class="input" bind:value={form.settings.password} />
+					</Field>
+				{/if}
+				{#if form.kind === 'grpc'}
+					<Field label="Service" id="service" hint="Empty checks the whole server">
+						<input id="service" class="input font-mono" placeholder="payments.v1.Payments" bind:value={form.settings.service} />
+					</Field>
+				{/if}
+				{#if form.kind === 'docker'}
+					<Field label="Docker host" id="docker-host" hint="Socket or tcp:// endpoint" error={fields.docker_host} class="sm:col-span-2">
+						<input id="docker-host" class="input font-mono" placeholder="unix:///var/run/docker.sock" bind:value={form.settings.docker_host} />
+					</Field>
+				{/if}
+				{#if form.kind === 'minecraft' || form.kind === 'steam'}
+					<Field label="Minimum players" id="min-players" hint="Degraded below this, 0 to disable" error={fields.min_players}>
+						<input id="min-players" type="number" min="0" class="input" bind:value={form.settings.min_players} />
+					</Field>
+				{/if}
+				{#if ['redis', 'smtp', 'imap', 'grpc'].includes(form.kind)}
+					<div class="flex items-end pb-2">
+						<Toggle label="Use TLS" description="Connect over TLS from the start" bind:checked={form.settings.tls} />
+					</div>
+				{/if}
+				{#if form.kind === 'smtp'}
+					<div class="flex items-end pb-2">
+						<Toggle label="Require STARTTLS" description="Fail when the server cannot upgrade" bind:checked={form.settings.starttls} />
+					</div>
+				{/if}
+			</div>
+			{#if form.kind === 'docker'}
+				<p class="mt-4 rounded-md bg-sunken px-3 py-2 text-xs text-muted">
+					heron needs read access to the Docker API. On a systemd install add the heron user to the docker group, or expose a read-only
+					socket proxy and point the host at it.
+				</p>
+			{/if}
 		</section>
 	{/if}
 
