@@ -3,12 +3,18 @@
 	import { ApiError, api, message } from '#lib/api.ts';
 	import Field from '#lib/components/Field.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
+	import Snippet from '#lib/components/Snippet.svelte';
+	import { badgeMarkdown, widgetSnippet } from '#lib/embed.ts';
 	import { toast } from '#lib/toast.svelte.ts';
 	import type { Page } from '#lib/types.ts';
 	import { goto } from '$app/navigation';
+	import { page as route } from '$app/state';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+
+	const origin = $derived(route.url.origin);
+	const widget = $derived(widgetSnippet(origin));
 
 	let page = $state<Page>(untrack(() => ({ ...data.page })));
 	let pageFields = $state<Record<string, string>>({});
@@ -87,6 +93,22 @@
 			<button class="btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
 		</div>
 	</form>
+
+	<section class="card space-y-4 p-5 sm:p-6">
+		<div>
+			<h2 class="font-semibold">Embed</h2>
+			<p class="text-muted">
+				Drop the widget on your own site and visitors see a small notice whenever there is an active incident or maintenance. It stays
+				invisible while everything is fine.
+			</p>
+		</div>
+		<Snippet label="Status widget" code={widget} />
+		<Snippet label="Overall status badge" preview="/badge" code={badgeMarkdown(origin, 'Status', '/badge', '')} />
+		<p class="text-xs text-muted">
+			Widget options: <code class="kbd">data-position</code> (bottom-right, bottom-left, top-right, top-left),
+			<code class="kbd">data-upcoming="true"</code> to announce maintenance in advance, <code class="kbd">data-refresh</code> in seconds.
+		</p>
+	</section>
 
 	<form class="card p-5 sm:p-6" onsubmit={changePassword} novalidate>
 		<h2 class="font-semibold">Password</h2>

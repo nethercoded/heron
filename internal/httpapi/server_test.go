@@ -309,6 +309,64 @@ func TestMaintenanceSuppressesIncidents(t *testing.T) {
 	}
 }
 
+func TestBadgesAndSummary(t *testing.T) {
+	h := newHarness(t)
+	h.signIn()
+
+	var site adminMonitorDTO
+	h.expect("POST", "/api/admin/monitors", monitorInput{Name: "Web <site>", Slug: "web", Kind: monitor.KindTCP, Target: "web:443", IntervalS: 60, Public: true}, http.StatusCreated, &site)
+	h.expect("POST", "/api/admin/monitors", monitorInput{Name: "Secret", Slug: "secret", Kind: monitor.KindTCP, Target: "db:5432", IntervalS: 60}, http.StatusCreated, nil)
+
+	m, _ := h.store.Monitor(t.Context(), site.ID)
+	h.engine.Record(t.Context(), scheduler.Beat{
+		Monitor:  m,
+		Result:   monitor.Result{Status: monitor.StatusUp, Latency: 120 * time.Millisecond, At: time.Now()},
+		Previous: monitor.StatusPending,
+		Current:  monitor.StatusUp,
+	})
+
+	get := func(path string) (*http.Response, string) {
+		t.Helper()
+		resp, err := http.Get(h.srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		return resp, string(body)
+	}
+
+	for path, want := range map[string]string{
+		"/badge":                   "operational",
+		"/badge/web":               "Web &lt;site&gt;",
+		"/badge/web/uptime":        "100%",
+		"/badge/web/response":      "120 ms",
+		"/badge/web?label=api":     ">api<",
+		"/badge/secret":            "unknown",
+		"/badge/web/uptime?period": "uptime 30d",
+	} {
+		resp, body := get(path)
+		if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "image/svg+xml") {
+			t.Errorf("%s: content type %q", path, ct)
+		}
+		if !strings.Contains(body, want) {
+			t.Errorf("%s: %q missing from %s", path, want, body)
+		}
+	}
+
+	resp, body := get("/api/summary")
+	if resp.Header.Get("Access-Control-Allow-Origin") != "*" {
+		t.Error("summary must allow cross-origin reads for the widget")
+	}
+	var summary summaryDTO
+	if err := json.Unmarshal([]byte(body), &summary); err != nil {
+		t.Fatal(err)
+	}
+	if summary.Status != overallOperational || len(summary.Items) != 0 || !strings.HasPrefix(summary.URL, "http://") {
+		t.Errorf("summary = %+v", summary)
+	}
+}
+
 func TestPush(t *testing.T) {
 	h := newHarness(t)
 	h.signIn()

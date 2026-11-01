@@ -148,6 +148,7 @@ func serve(args []string) error {
 
 	api := httpapi.New(db, eng, sched, dispatcher, auth.NewSessions(db, cfg.SecureCookies()), log.With("component", "http"), httpapi.Options{
 		Version:        ver,
+		PublicURL:      cfg.PublicURL,
 		Location:       cfg.Location,
 		TrustedProxies: cfg.Proxies,
 		Assets:         web.Assets(),

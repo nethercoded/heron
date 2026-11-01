@@ -5,7 +5,10 @@
 	import LatencyChart from '#lib/components/LatencyChart.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import RangeTabs from '#lib/components/RangeTabs.svelte';
+	import Snippet from '#lib/components/Snippet.svelte';
 	import StatusBadge from '#lib/components/StatusBadge.svelte';
+	import UptimeCalendar from '#lib/components/UptimeCalendar.svelte';
+	import { badgeMarkdown } from '#lib/embed.ts';
 	import { ago, between, formatDateTime, interval, latency } from '#lib/format.ts';
 	import { Clock, Live } from '#lib/live.svelte.ts';
 	import { kindLabel, statusLabel, statusText } from '#lib/status.ts';
@@ -23,6 +26,11 @@
 	let busy = $state(false);
 	const clock = new Clock(10_000);
 
+	const badges = $derived([
+		{ label: 'Status', path: `/badge/${m.slug}` },
+		{ label: 'Uptime 30d', path: `/badge/${m.slug}/uptime?period=30d` },
+		{ label: 'Response time', path: `/badge/${m.slug}/response` }
+	]);
 	const pushURL = $derived(m.push_token ? `${page.url.origin}/api/push/${m.push_token}` : '');
 
 	$effect(() => {
@@ -155,6 +163,11 @@
 			<LatencyChart points={series?.points ?? []} />
 		</section>
 
+		<section class="card p-5">
+			<h2 class="mb-4 font-semibold">Uptime calendar</h2>
+			<UptimeCalendar days={data.calendar.days} since={data.calendar.since} />
+		</section>
+
 		<section class="card overflow-hidden">
 			<h2 class="border-b border-line px-5 py-3.5 font-semibold">Recent checks</h2>
 			<div class="max-h-[28rem] overflow-y-auto">
@@ -193,5 +206,17 @@
 				</a>
 			{/if}
 		</section>
+
+		{#if m.public}
+			<section class="card space-y-4 p-5">
+				<div>
+					<h2 class="font-semibold">Badges</h2>
+					<p class="mt-0.5 text-xs text-muted">Markdown for a README or docs page.</p>
+				</div>
+				{#each badges as badge (badge.path)}
+					<Snippet label={badge.label} preview={badge.path} code={badgeMarkdown(page.url.origin, badge.label, badge.path, `/monitor/${m.slug}`)} />
+				{/each}
+			</section>
+		{/if}
 	</aside>
 </div>
