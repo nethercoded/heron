@@ -1,0 +1,56 @@
+version: 2
+
+project_name: heron
+
+before:
+  hooks:
+    - go mod download
+    - sh -c "cd web && pnpm install --frozen-lockfile && pnpm build"
+
+builds:
+  - id: heron
+    main: ./cmd/heron
+    binary: heron
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, freebsd]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+      - heron.example.toml
+      - deploy/heron.service
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: Fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: Other
+      order: 999
+
+release:
+  github:
+    owner: nethercode
+    name: heron

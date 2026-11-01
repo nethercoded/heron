@@ -1,0 +1,12 @@
+listen = ":8080"
+data_dir = "/var/lib/heron"
+public_url = "https://status.example.com"
+
+log_level = "info"
+log_format = "json"
+
+timezone = "UTC"
+retention_days = 7
+
+trusted_proxies = ["127.0.0.1", "::1"]
+icmp_privileged = true

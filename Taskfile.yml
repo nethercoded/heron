@@ -1,0 +1,62 @@
+version: "3"
+
+vars:
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo dev
+
+tasks:
+  default:
+    cmds:
+      - task --list
+
+  web:install:
+    desc: Install frontend dependencies
+    dir: web
+    sources: [package.json, pnpm-lock.yaml]
+    cmds:
+      - pnpm install --frozen-lockfile
+
+  web:build:
+    desc: Build the frontend into web/build
+    dir: web
+    deps: [web:install]
+    sources: ["src/**/*", "static/**/*", "vite.config.ts", "package.json"]
+    generates: ["build/index.html"]
+    cmds:
+      - pnpm build
+
+  build:
+    desc: Build a production binary
+    deps: [web:build]
+    env:
+      CGO_ENABLED: "0"
+    cmds:
+      - go build -trimpath -ldflags "-s -w -X main.version={{.VERSION}}" -o heron ./cmd/heron
+
+  dev:
+    desc: Run the backend and the Vite dev server side by side
+    deps: [web:install]
+    cmds:
+      - task: web:build
+      - cmd: go run ./cmd/heron serve & (cd web && pnpm dev)
+    env:
+      HERON_DATA_DIR: ./data
+      HERON_LOG_LEVEL: debug
+
+  test:
+    desc: Run all tests
+    deps: [web:build]
+    cmds:
+      - go test -race -count=1 ./...
+
+  lint:
+    desc: Lint Go and frontend code
+    deps: [web:build]
+    cmds:
+      - golangci-lint run
+      - cd web && pnpm check && pnpm lint
+
+  release:snapshot:
+    desc: Build release archives locally
+    cmds:
+      - goreleaser release --snapshot --clean

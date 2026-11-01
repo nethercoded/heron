@@ -1,0 +1,24 @@
+services:
+  heron:
+    image: ghcr.io/nethercode/heron:latest
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      HERON_PUBLIC_URL: https://status.example.com
+      HERON_TIMEZONE: UTC
+    volumes:
+      - heron-data:/data
+    cap_add:
+      - NET_RAW
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/heron", "version"]
+      interval: 1m
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+volumes:
+  heron-data:
