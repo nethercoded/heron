@@ -59,4 +59,6 @@ say "heron $("$BIN_DIR/heron" version | cut -d' ' -f2) is running"
 sleep 1
 code=$(journalctl -u heron -n 50 --no-pager 2>/dev/null | sed -n 's/.*setup_code[=":]*\([A-Za-z0-9_-]*\).*/\1/p' | tail -n1)
 say "open http://$(hostname -I 2>/dev/null | cut -d' ' -f1):8080/admin to create the administrator"
-[ -n "$code" ] && say "setup code: $code"
+if [ -n "$code" ]; then
+	say "setup code: $code"
+fi
