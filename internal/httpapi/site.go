@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/nethercoded/heron/internal/site"
+	"github.com/nethercoded/heron/internal/store"
 )
 
 type Site interface {
@@ -74,8 +75,12 @@ func (s *Server) installDomain(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	if users > 0 {
-		if _, err := s.sessions.User(r.Context(), w, r); err != nil {
+		u, err := s.sessions.User(r.Context(), w, r)
+		if err != nil {
 			return errorf(http.StatusUnauthorized, "unauthorized", "sign in required")
+		}
+		if !u.Role.Allows(store.RoleOwner) {
+			return errorf(http.StatusForbidden, "forbidden", "only the owner can change the domain")
 		}
 	} else if code := s.opts.SetupCode; code != "" && subtle.ConstantTimeCompare([]byte(strings.ToUpper(strings.TrimSpace(in.Code))), []byte(code)) != 1 {
 		return &Error{Status: http.StatusForbidden, Code: "invalid", Message: "validation failed", Fields: map[string]string{"code": "does not match the code in the server log"}}
@@ -91,6 +96,7 @@ func (s *Server) applySite(w http.ResponseWriter, r *http.Request, in siteInput)
 	if err != nil {
 		return err
 	}
+	describe(r, in.Domain)
 	cur := s.opts.Site.Settings()
 	s.log.Info("site updated", "domain", cur.Domain, "mode", cur.Mode)
 	return ok(w, siteDTO{Domain: cur.Domain, Mode: cur.Mode, Email: cur.Email, URL: res.URL, Reachable: res.Reachable})

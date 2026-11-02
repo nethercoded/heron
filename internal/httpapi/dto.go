@@ -229,6 +229,13 @@ func toAdminMonitor(m *monitor.Monitor) adminMonitorDTO {
 	}
 }
 
+func (d *adminMonitorDTO) redact(m *monitor.Monitor) {
+	d.Target = m.DisplayTarget()
+	d.Settings.Password = ""
+	d.Settings.Headers = nil
+	d.PushToken = ""
+}
+
 type channelDTO struct {
 	ID        int64         `json:"id"`
 	Name      string        `json:"name"`
@@ -275,12 +282,24 @@ type setupInput struct {
 }
 
 type userDTO struct {
-	Username string `json:"username"`
+	ID         int64      `json:"id"`
+	Username   string     `json:"username"`
+	Role       store.Role `json:"role"`
+	TwoFactor  bool       `json:"two_factor"`
+	CreatedAt  stamp      `json:"created_at"`
+	LastSeenAt stamp      `json:"last_seen_at,omitzero"`
 }
 
 func toUser(u *store.User) *userDTO {
 	if u == nil {
 		return nil
 	}
-	return &userDTO{Username: u.Username}
+	return &userDTO{
+		ID:         u.ID,
+		Username:   u.Username,
+		Role:       u.Role,
+		TwoFactor:  u.TwoFactor(),
+		CreatedAt:  stamp(u.CreatedAt),
+		LastSeenAt: stamp(u.LastSeenAt),
+	}
 }

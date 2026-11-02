@@ -146,6 +146,7 @@ func (s *Server) saveMaintenance(w http.ResponseWriter, r *http.Request, id int6
 	if err := s.store.SaveMaintenanceWindow(r.Context(), &mw); err != nil {
 		return err
 	}
+	describe(r, mw.Title)
 	if err := s.engine.ReloadMaintenance(r.Context()); err != nil {
 		return err
 	}
@@ -165,6 +166,9 @@ func (s *Server) deleteMaintenance(w http.ResponseWriter, r *http.Request) error
 	id, err := pathID(r)
 	if err != nil {
 		return err
+	}
+	if mw, err := s.store.MaintenanceWindow(r.Context(), id); err == nil {
+		describe(r, mw.Title)
 	}
 	if err := s.store.DeleteMaintenanceWindow(r.Context(), id); err != nil {
 		return err

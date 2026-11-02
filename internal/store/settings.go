@@ -67,3 +67,21 @@ func (s *Store) SavePage(ctx context.Context, page Page) error {
 	_, err = s.db.ExecContext(ctx, `insert into settings (key, value) values ('page', ?) on conflict (key) do update set value = excluded.value`, raw)
 	return err
 }
+
+func (s *Store) MetricsToken(ctx context.Context) (string, error) {
+	var token string
+	err := s.db.QueryRowContext(ctx, `select value from settings where key = 'metrics_token'`).Scan(&token)
+	if errors.Is(translate(err), ErrNotFound) {
+		return "", nil
+	}
+	return token, err
+}
+
+func (s *Store) SetMetricsToken(ctx context.Context, token string) error {
+	if token == "" {
+		_, err := s.db.ExecContext(ctx, `delete from settings where key = 'metrics_token'`)
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `insert into settings (key, value) values ('metrics_token', ?) on conflict (key) do update set value = excluded.value`, token)
+	return err
+}

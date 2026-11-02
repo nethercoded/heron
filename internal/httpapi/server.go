@@ -37,14 +37,16 @@ type Options struct {
 }
 
 type Server struct {
-	store     *store.Store
-	engine    *engine.Engine
-	scheduler Scheduler
-	sender    Sender
-	sessions  *auth.Sessions
-	limiter   *auth.Limiter
-	log       *slog.Logger
-	opts      Options
+	store      *store.Store
+	engine     *engine.Engine
+	scheduler  Scheduler
+	sender     Sender
+	sessions   *auth.Sessions
+	limiter    *auth.Limiter
+	secondStep *auth.Tickets[int64]
+	ceremonies *auth.Tickets[ceremony]
+	log        *slog.Logger
+	opts       Options
 }
 
 func New(s *store.Store, e *engine.Engine, sched Scheduler, sender Sender, sessions *auth.Sessions, log *slog.Logger, opts Options) *Server {
@@ -52,14 +54,16 @@ func New(s *store.Store, e *engine.Engine, sched Scheduler, sender Sender, sessi
 		opts.Location = time.UTC
 	}
 	return &Server{
-		store:     s,
-		engine:    e,
-		scheduler: sched,
-		sender:    sender,
-		sessions:  sessions,
-		limiter:   auth.NewLimiter(10, 15*time.Minute),
-		log:       log,
-		opts:      opts,
+		store:      s,
+		engine:     e,
+		scheduler:  sched,
+		sender:     sender,
+		sessions:   sessions,
+		limiter:    auth.NewLimiter(10, 15*time.Minute),
+		secondStep: auth.NewTickets[int64](5 * time.Minute),
+		ceremonies: auth.NewTickets[ceremony](5 * time.Minute),
+		log:        log,
+		opts:       opts,
 	}
 }
 
@@ -88,48 +92,82 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /api/install/domain", s.handle(s.installDomain))
 	mux.HandleFunc("GET "+site.ProbePath+"{nonce}", s.probe)
 	mux.Handle("POST /api/auth/login", s.handle(s.login))
+	mux.Handle("POST /api/auth/login/code", s.handle(s.loginWithCode))
+	mux.Handle("POST /api/auth/passkey/begin", s.handle(s.beginPasskeyLogin))
+	mux.Handle("POST /api/auth/passkey/finish", s.handle(s.finishPasskeyLogin))
+	mux.Handle("POST /api/auth/invite", s.handle(s.inviteInfo))
+	mux.Handle("POST /api/auth/join", s.handle(s.join))
 	mux.Handle("POST /api/auth/logout", s.handle(s.logout))
+	mux.Handle("GET /metrics", s.handle(s.metrics))
 
 	admin := http.NewServeMux()
-	admin.Handle("PUT /api/admin/account/password", s.handle(s.changePassword))
+	do := func(action string, h handlerFunc) http.Handler {
+		return s.handle(s.audited(action, h))
+	}
+	owner := func(action string, h handlerFunc) http.Handler {
+		return s.handle(s.role(store.RoleOwner, s.audited(action, h)))
+	}
+
+	admin.Handle("PUT /api/admin/account/password", do("account.password", s.changePassword))
+	admin.Handle("POST /api/admin/account/totp", s.handle(s.startTOTP))
+	admin.Handle("PUT /api/admin/account/totp", do("account.2fa_on", s.enableTOTP))
+	admin.Handle("POST /api/admin/account/totp/disable", do("account.2fa_off", s.disableTOTP))
+	admin.Handle("GET /api/admin/account/passkeys", s.handle(s.listPasskeys))
+	admin.Handle("POST /api/admin/account/passkeys/begin", s.handle(s.beginPasskey))
+	admin.Handle("POST /api/admin/account/passkeys/finish", do("account.passkey_add", s.finishPasskey))
+	admin.Handle("DELETE /api/admin/account/passkeys/{id}", do("account.passkey_remove", s.deletePasskey))
 
 	admin.Handle("GET /api/admin/monitors", s.handle(s.listMonitors))
-	admin.Handle("POST /api/admin/monitors", s.handle(s.createMonitor))
-	admin.Handle("PUT /api/admin/monitors/order", s.handle(s.reorderMonitors))
+	admin.Handle("POST /api/admin/monitors", do("monitor.create", s.createMonitor))
+	admin.Handle("PUT /api/admin/monitors/order", do("monitor.reorder", s.reorderMonitors))
 	admin.Handle("GET /api/admin/monitors/{id}", s.handle(s.getMonitor))
 	admin.Handle("GET /api/admin/monitors/{id}/series", s.handle(s.adminSeries))
 	admin.Handle("GET /api/admin/monitors/{id}/calendar", s.handle(s.adminCalendar))
-	admin.Handle("PUT /api/admin/monitors/{id}", s.handle(s.updateMonitor))
-	admin.Handle("DELETE /api/admin/monitors/{id}", s.handle(s.deleteMonitor))
-	admin.Handle("POST /api/admin/monitors/{id}/pause", s.handle(s.pauseMonitor(true)))
-	admin.Handle("POST /api/admin/monitors/{id}/resume", s.handle(s.pauseMonitor(false)))
+	admin.Handle("PUT /api/admin/monitors/{id}", do("monitor.update", s.updateMonitor))
+	admin.Handle("DELETE /api/admin/monitors/{id}", do("monitor.delete", s.deleteMonitor))
+	admin.Handle("POST /api/admin/monitors/{id}/pause", do("monitor.pause", s.pauseMonitor(true)))
+	admin.Handle("POST /api/admin/monitors/{id}/resume", do("monitor.resume", s.pauseMonitor(false)))
 	admin.Handle("POST /api/admin/monitors/{id}/check", s.handle(s.checkMonitor))
-	admin.Handle("POST /api/admin/monitors/{id}/token", s.handle(s.rotateToken))
+	admin.Handle("POST /api/admin/monitors/{id}/token", do("monitor.token", s.rotateToken))
 
-	admin.Handle("GET /api/admin/channels", s.handle(s.listChannels))
-	admin.Handle("POST /api/admin/channels", s.handle(s.createChannel))
-	admin.Handle("PUT /api/admin/channels/{id}", s.handle(s.updateChannel))
-	admin.Handle("DELETE /api/admin/channels/{id}", s.handle(s.deleteChannel))
+	admin.Handle("GET /api/admin/channels", s.handle(s.role(store.RoleAdmin, s.listChannels)))
+	admin.Handle("POST /api/admin/channels", do("channel.create", s.createChannel))
+	admin.Handle("PUT /api/admin/channels/{id}", do("channel.update", s.updateChannel))
+	admin.Handle("DELETE /api/admin/channels/{id}", do("channel.delete", s.deleteChannel))
 	admin.Handle("POST /api/admin/channels/{id}/test", s.handle(s.testChannel))
 
 	admin.Handle("GET /api/admin/incidents", s.handle(s.listIncidents))
-	admin.Handle("POST /api/admin/incidents", s.handle(s.createIncident))
+	admin.Handle("POST /api/admin/incidents", do("incident.create", s.createIncident))
 	admin.Handle("GET /api/admin/incidents/{id}", s.handle(s.getIncident))
-	admin.Handle("PUT /api/admin/incidents/{id}", s.handle(s.updateIncident))
-	admin.Handle("DELETE /api/admin/incidents/{id}", s.handle(s.deleteIncident))
-	admin.Handle("POST /api/admin/incidents/{id}/updates", s.handle(s.addIncidentUpdate))
+	admin.Handle("PUT /api/admin/incidents/{id}", do("incident.update", s.updateIncident))
+	admin.Handle("DELETE /api/admin/incidents/{id}", do("incident.delete", s.deleteIncident))
+	admin.Handle("POST /api/admin/incidents/{id}/updates", do("incident.post", s.addIncidentUpdate))
 
 	admin.Handle("GET /api/admin/maintenance", s.handle(s.listMaintenance))
-	admin.Handle("POST /api/admin/maintenance", s.handle(s.createMaintenance))
+	admin.Handle("POST /api/admin/maintenance", do("maintenance.create", s.createMaintenance))
 	admin.Handle("GET /api/admin/maintenance/{id}", s.handle(s.getMaintenance))
-	admin.Handle("PUT /api/admin/maintenance/{id}", s.handle(s.updateMaintenance))
-	admin.Handle("DELETE /api/admin/maintenance/{id}", s.handle(s.deleteMaintenance))
+	admin.Handle("PUT /api/admin/maintenance/{id}", do("maintenance.update", s.updateMaintenance))
+	admin.Handle("DELETE /api/admin/maintenance/{id}", do("maintenance.delete", s.deleteMaintenance))
 
 	admin.Handle("GET /api/admin/site", s.handle(s.getSite))
-	admin.Handle("PUT /api/admin/site", s.handle(s.saveSite))
+	admin.Handle("PUT /api/admin/site", owner("settings.domain", s.saveSite))
 
 	admin.Handle("GET /api/admin/page", s.handle(s.getPage))
-	admin.Handle("PUT /api/admin/page", s.handle(s.savePage))
+	admin.Handle("PUT /api/admin/page", do("settings.page", s.savePage))
+
+	admin.Handle("GET /api/admin/metrics", s.handle(s.role(store.RoleAdmin, s.getMetricsToken)))
+	admin.Handle("POST /api/admin/metrics", do("settings.metrics_token", s.rotateMetricsToken))
+	admin.Handle("DELETE /api/admin/metrics", do("settings.metrics_off", s.disableMetrics))
+
+	admin.Handle("GET /api/admin/users", s.handle(s.listUsers))
+	admin.Handle("POST /api/admin/invites", owner("user.invite", s.createInvite))
+	admin.Handle("DELETE /api/admin/invites/{id}", owner("user.invite_revoke", s.deleteInvite))
+	admin.Handle("PUT /api/admin/users/{id}", owner("user.role", s.updateUser))
+	admin.Handle("DELETE /api/admin/users/{id}", owner("user.delete", s.deleteUser))
+	admin.Handle("DELETE /api/admin/users/{id}/sessions", owner("user.sign_out", s.revokeUserSessions))
+	admin.Handle("DELETE /api/admin/users/{id}/two-factor", owner("user.2fa_reset", s.resetTwoFactor))
+
+	admin.Handle("GET /api/admin/audit", s.handle(s.listAudit))
 
 	mux.Handle("/api/admin/", s.requireAdmin(admin))
 	mux.Handle("/api/", s.handle(func(http.ResponseWriter, *http.Request) error {

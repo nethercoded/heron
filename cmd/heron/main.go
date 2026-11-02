@@ -43,6 +43,7 @@ Usage:
   heron [serve] [-config path]          start the server
   heron user create -u name [-config]   create an administrator
   heron user passwd -u name [-config]   change a password
+  heron user reset-2fa -u name          turn off two-factor sign in
   heron version                         print the version
 
 The config file defaults to $HERON_CONFIG or ./heron.toml.
@@ -237,7 +238,7 @@ func setupURL(cfg config.Config, addr net.Addr) string {
 
 func user(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: heron user create|passwd -u name")
+		return errors.New("usage: heron user create|passwd|reset-2fa -u name")
 	}
 	action := args[0]
 
@@ -258,6 +259,18 @@ func user(args []string) error {
 	}
 	defer db.Close()
 
+	if action == "reset-2fa" {
+		u, err := db.UserByName(ctx, *username)
+		if err != nil {
+			return fmt.Errorf("user %q: %w", *username, err)
+		}
+		if err := db.SetTOTP(ctx, u.ID, ""); err != nil {
+			return err
+		}
+		fmt.Printf("two-factor sign in for %s is off\n", *username)
+		return nil
+	}
+
 	password, err := readPassword(os.Stdin)
 	if err != nil {
 		return err
@@ -272,13 +285,21 @@ func user(args []string) error {
 
 	switch action {
 	case "create":
-		if _, err := db.CreateUser(ctx, *username, hash); err != nil {
+		count, err := db.CountUsers(ctx)
+		if err != nil {
+			return err
+		}
+		role := store.RoleAdmin
+		if count == 0 {
+			role = store.RoleOwner
+		}
+		if _, err := db.CreateUser(ctx, *username, hash, role); err != nil {
 			if errors.Is(err, store.ErrConflict) {
 				return fmt.Errorf("user %q already exists", *username)
 			}
 			return err
 		}
-		fmt.Printf("user %s created\n", *username)
+		fmt.Printf("user %s created (%s)\n", *username, role)
 	case "passwd":
 		u, err := db.UserByName(ctx, *username)
 		if err != nil {

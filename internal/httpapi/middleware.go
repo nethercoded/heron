@@ -32,8 +32,25 @@ func (s *Server) requireAdmin(next http.Handler) http.Handler {
 			return
 		}
 		w.Header().Set("Cache-Control", "no-store")
+		if !user.Role.Allows(store.RoleAdmin) && !readOnly(r.Method) && !strings.HasPrefix(r.URL.Path, "/api/admin/account/") {
+			s.fail(w, r, errorf(http.StatusForbidden, "forbidden", "your role can only view"))
+			return
+		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userKey{}, user)))
 	})
+}
+
+func (s *Server) role(min store.Role, h handlerFunc) handlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		if !userFrom(r.Context()).Role.Allows(min) {
+			return errorf(http.StatusForbidden, "forbidden", "this needs the %s role", min)
+		}
+		return h(w, r)
+	}
+}
+
+func readOnly(method string) bool {
+	return method == http.MethodGet || method == http.MethodHead
 }
 
 type recorder struct {

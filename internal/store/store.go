@@ -132,7 +132,14 @@ func (s *Store) Prune(ctx context.Context, resultsBefore, rollupsBefore time.Tim
 		if _, err := tx.ExecContext(ctx, `delete from rollups where bucket < ?`, rollupsBefore.Unix()); err != nil {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, `delete from sessions where expires_at < ?`, time.Now().Unix())
+		now := time.Now()
+		if _, err := tx.ExecContext(ctx, `delete from invites where expires_at < ?`, now.Unix()); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `delete from audit_log where at < ?`, now.AddDate(-1, 0, 0).Unix()); err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `delete from sessions where expires_at < ?`, now.Unix())
 		return err
 	})
 	return removed, err

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/nethercoded/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/store"
 )
 
 func (s *Server) listMonitors(w http.ResponseWriter, r *http.Request) error {
@@ -18,9 +19,13 @@ func (s *Server) listMonitors(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	viewer := !userFrom(ctx).Role.Allows(store.RoleAdmin)
 	out := make([]adminMonitorDTO, 0, len(list))
 	for _, m := range list {
 		dto := toAdminMonitor(m)
+		if viewer {
+			dto.redact(m)
+		}
 		if u, ok := uptimes[m.ID]; ok {
 			ratio := u.Ratio()
 			dto.Uptime = &ratio
@@ -39,7 +44,11 @@ func (s *Server) getMonitor(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	return ok(w, map[string]any{"monitor": toAdminMonitor(m), "beats": toBeats(beats, true)})
+	dto := toAdminMonitor(m)
+	if !userFrom(r.Context()).Role.Allows(store.RoleAdmin) {
+		dto.redact(m)
+	}
+	return ok(w, map[string]any{"monitor": dto, "beats": toBeats(beats, true)})
 }
 
 func (s *Server) createMonitor(w http.ResponseWriter, r *http.Request) error {
@@ -60,6 +69,7 @@ func (s *Server) createMonitor(w http.ResponseWriter, r *http.Request) error {
 	s.engine.Forget(m.ID)
 	s.scheduler.Sync(m)
 	s.engine.Changed(m)
+	describe(r, m.Name)
 	s.log.Info("monitor created", "monitor", m.Slug, "kind", m.Kind)
 	return created(w, toAdminMonitor(m))
 }
@@ -86,6 +96,7 @@ func (s *Server) updateMonitor(w http.ResponseWriter, r *http.Request) error {
 	if err := s.store.UpdateMonitor(r.Context(), m); err != nil {
 		return slugConflict(err)
 	}
+	describe(r, m.Name)
 	s.engine.Forget(m.ID)
 	s.scheduler.Sync(m)
 	s.engine.Changed(m)
@@ -96,6 +107,9 @@ func (s *Server) deleteMonitor(w http.ResponseWriter, r *http.Request) error {
 	id, err := pathID(r)
 	if err != nil {
 		return err
+	}
+	if m, err := s.store.Monitor(r.Context(), id); err == nil {
+		describe(r, m.Name)
 	}
 	s.engine.Forget(id)
 	s.scheduler.Stop(id)
@@ -116,6 +130,7 @@ func (s *Server) pauseMonitor(paused bool) handlerFunc {
 		if err != nil {
 			return err
 		}
+		describe(r, m.Name)
 		s.engine.Forget(m.ID)
 		s.scheduler.Sync(m)
 		s.engine.Changed(m)

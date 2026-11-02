@@ -36,6 +36,7 @@ func (s *Server) createChannel(w http.ResponseWriter, r *http.Request) error {
 	if err := s.store.CreateChannel(r.Context(), c); err != nil {
 		return err
 	}
+	describe(r, c.Name)
 	return created(w, toChannel(c))
 }
 
@@ -55,6 +56,7 @@ func (s *Server) updateChannel(w http.ResponseWriter, r *http.Request) error {
 	if err := s.store.UpdateChannel(r.Context(), c); err != nil {
 		return err
 	}
+	describe(r, c.Name)
 	fresh, err := s.store.Channel(r.Context(), id)
 	if err != nil {
 		return err
@@ -66,6 +68,9 @@ func (s *Server) deleteChannel(w http.ResponseWriter, r *http.Request) error {
 	id, err := pathID(r)
 	if err != nil {
 		return err
+	}
+	if c, err := s.store.Channel(r.Context(), id); err == nil {
+		describe(r, c.Name)
 	}
 	if err := s.store.DeleteChannel(r.Context(), id); err != nil {
 		return err

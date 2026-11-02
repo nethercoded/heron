@@ -65,6 +65,7 @@ func (s *Server) createIncident(w http.ResponseWriter, r *http.Request) error {
 	if err := s.store.CreateIncident(r.Context(), inc, body); err != nil {
 		return err
 	}
+	describe(r, inc.Title)
 	s.engine.IncidentsChanged()
 
 	byID, err := s.monitorIndex(r)
@@ -99,6 +100,7 @@ func (s *Server) updateIncident(w http.ResponseWriter, r *http.Request) error {
 	if err := s.store.UpdateIncident(r.Context(), inc); err != nil {
 		return err
 	}
+	describe(r, inc.Title)
 	s.engine.IncidentsChanged()
 	return s.getIncident(w, r)
 }
@@ -129,6 +131,7 @@ func (s *Server) addIncidentUpdate(w http.ResponseWriter, r *http.Request) error
 	if err != nil {
 		return err
 	}
+	describe(r, inc.Title+" → "+string(in.Status))
 	s.engine.IncidentsChanged()
 
 	byID, err := s.monitorIndex(r)
@@ -142,6 +145,9 @@ func (s *Server) deleteIncident(w http.ResponseWriter, r *http.Request) error {
 	id, err := pathID(r)
 	if err != nil {
 		return err
+	}
+	if inc, err := s.store.Incident(r.Context(), id); err == nil {
+		describe(r, inc.Title)
 	}
 	if err := s.store.DeleteIncident(r.Context(), id); err != nil {
 		return err

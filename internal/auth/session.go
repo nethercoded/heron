@@ -30,7 +30,7 @@ func NewSessions(s *store.Store, secure bool) *Sessions {
 	return &Sessions{store: s, secure: secure, dummy: dummy}
 }
 
-func (s *Sessions) Login(ctx context.Context, w http.ResponseWriter, r *http.Request, username, password string) (*store.User, error) {
+func (s *Sessions) Authenticate(ctx context.Context, username, password string) (*store.User, error) {
 	user, err := s.store.UserByName(ctx, username)
 	if errors.Is(err, store.ErrNotFound) {
 		_, _ = Verify(s.dummy, password)
@@ -47,17 +47,17 @@ func (s *Sessions) Login(ctx context.Context, w http.ResponseWriter, r *http.Req
 	if !ok {
 		return nil, ErrInvalidCredentials
 	}
-	return user, s.Start(ctx, w, r, user)
+	return user, nil
 }
 
 func (s *Sessions) Start(ctx context.Context, w http.ResponseWriter, r *http.Request, user *store.User) error {
 	token := rand.Text()
 	expires := time.Now().Add(sessionTTL)
-	if err := s.store.CreateSession(ctx, digest(token), user.ID, expires); err != nil {
+	if err := s.store.CreateSession(ctx, Digest(token), user.ID, expires); err != nil {
 		return err
 	}
 	http.SetCookie(w, s.cookie(r, token, expires))
-	return nil
+	return s.store.TouchUser(ctx, user.ID)
 }
 
 func (s *Sessions) User(ctx context.Context, w http.ResponseWriter, r *http.Request) (*store.User, error) {
@@ -65,7 +65,7 @@ func (s *Sessions) User(ctx context.Context, w http.ResponseWriter, r *http.Requ
 	if err != nil || c.Value == "" {
 		return nil, store.ErrNotFound
 	}
-	hash := digest(c.Value)
+	hash := Digest(c.Value)
 	user, expires, err := s.store.SessionUser(ctx, hash)
 	if err != nil {
 		return nil, err
@@ -82,7 +82,7 @@ func (s *Sessions) User(ctx context.Context, w http.ResponseWriter, r *http.Requ
 func (s *Sessions) Logout(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 	http.SetCookie(w, s.cookie(r, "", time.Unix(1, 0)))
 	if c, err := r.Cookie(CookieName); err == nil {
-		return s.store.DeleteSession(ctx, digest(c.Value))
+		return s.store.DeleteSession(ctx, Digest(c.Value))
 	}
 	return nil
 }
@@ -90,7 +90,7 @@ func (s *Sessions) Logout(ctx context.Context, w http.ResponseWriter, r *http.Re
 func (s *Sessions) Revoke(ctx context.Context, r *http.Request, userID int64) error {
 	var keep []byte
 	if c, err := r.Cookie(CookieName); err == nil {
-		keep = digest(c.Value)
+		keep = Digest(c.Value)
 	}
 	return s.store.DeleteUserSessions(ctx, userID, keep)
 }
@@ -107,7 +107,7 @@ func (s *Sessions) cookie(r *http.Request, value string, expires time.Time) *htt
 	}
 }
 
-func digest(token string) []byte {
+func Digest(token string) []byte {
 	sum := sha256.Sum256([]byte(token))
 	return sum[:]
 }

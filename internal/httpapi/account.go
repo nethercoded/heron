@@ -64,6 +64,7 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) error {
 	if err := s.sessions.Start(r.Context(), w, r, user); err != nil {
 		return err
 	}
+	s.record(r, user, "user.setup", "")
 	s.log.Info("administrator created", "username", user.Username)
 	return created(w, toUser(user))
 }
@@ -79,19 +80,36 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) error {
 	if err := decode(w, r, &in); err != nil {
 		return err
 	}
-	user, err := s.sessions.Login(r.Context(), w, r, strings.TrimSpace(in.Username), in.Password)
+	username := strings.TrimSpace(in.Username)
+	user, err := s.sessions.Authenticate(r.Context(), username, in.Password)
 	if errors.Is(err, auth.ErrInvalidCredentials) {
-		s.log.Warn("failed login", "username", in.Username, "ip", ip)
+		s.log.Warn("failed login", "username", username, "ip", ip)
+		s.record(r, &store.User{Username: username}, "auth.login_failed", "")
 		return errorf(http.StatusUnauthorized, "invalid_credentials", "invalid username or password")
 	}
 	if err != nil {
 		return err
 	}
+	if user.TwoFactor() {
+		return ok(w, loginDTO{Ticket: s.secondStep.Issue(user.ID)})
+	}
 	s.limiter.Reset(ip)
-	return ok(w, toUser(user))
+	if err := s.sessions.Start(r.Context(), w, r, user); err != nil {
+		return err
+	}
+	s.record(r, user, "auth.login", "password")
+	return ok(w, loginDTO{User: toUser(user)})
+}
+
+type loginDTO struct {
+	User   *userDTO `json:"user,omitzero"`
+	Ticket string   `json:"ticket,omitzero"`
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) error {
+	if u, err := s.sessions.User(r.Context(), w, r); err == nil {
+		s.record(r, u, "auth.logout", "")
+	}
 	if err := s.sessions.Logout(r.Context(), w, r); err != nil {
 		return err
 	}
