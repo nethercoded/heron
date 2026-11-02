@@ -1,13 +1,17 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
+	import { flip } from 'svelte/animate';
+	import { api, message } from '#lib/api.ts';
 	import Icon from '#lib/components/Icon.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import StatusBadge from '#lib/components/StatusBadge.svelte';
 	import { ago, displayTarget, interval, latency, percent } from '#lib/format.ts';
 	import { Clock, debounce, Live } from '#lib/live.svelte.ts';
 	import { kindLabel, statusLabel } from '#lib/status.ts';
-	import type { AdminMonitor, Status } from '#lib/types.ts';
-	import { invalidate } from '$app/navigation';
+	import { toast } from '#lib/toast.svelte.ts';
+	import type { AdminMonitor, Kind, Status } from '#lib/types.ts';
+	import { goto, invalidate } from '$app/navigation';
+	import { page } from '$app/state';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -17,9 +21,16 @@
 		monitors = data.monitors;
 	});
 
-	let query = $state('');
-	let filter = $state<Status | 'all'>('all');
+	const params = untrack(() => page.url.searchParams);
+	const initialStatus = params.get('status') ?? '';
+
+	let query = $state(params.get('q') ?? '');
+	let filter = $state<Status | 'all'>(initialStatus in statusLabel ? (initialStatus as Status) : 'all');
+	let kind = $state(params.get('kind') ?? '');
+	let group = $state(params.get('group') ?? '');
 	const clock = new Clock(10_000);
+
+	const canEdit = $derived((page.data as { user?: { role?: string } }).user?.role !== 'viewer');
 
 	const counts = $derived(
 		monitors.reduce<Record<Status, number>>(
@@ -36,18 +47,52 @@
 		measured.length ? measured.reduce((s, m) => s + (m.uptime_24h ?? 0), 0) / measured.length : null
 	);
 
+	const kinds = $derived(
+		[...new Set(monitors.map((m) => m.kind))].sort((a, b) => kindLabel[a].localeCompare(kindLabel[b]))
+	);
+	const groups = $derived(
+		[...new Set(monitors.map((m) => m.group).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+	);
+	const ungrouped = $derived(monitors.some((m) => !m.group));
+
+	const filtered = $derived(query.trim() !== '' || filter !== 'all' || kind !== '' || group !== '');
+
 	const visible = $derived(
 		monitors.filter((m) => {
 			if (filter !== 'all' && m.status !== filter) return false;
+			if (kind && m.kind !== kind) return false;
+			if (group && m.group !== group) return false;
 			const q = query.trim().toLowerCase();
 			return (
 				!q ||
 				m.name.toLowerCase().includes(q) ||
+				m.slug.toLowerCase().includes(q) ||
 				m.target.toLowerCase().includes(q) ||
-				m.group.toLowerCase().includes(q)
+				m.group.toLowerCase().includes(q) ||
+				kindLabel[m.kind].toLowerCase().includes(q)
 			);
 		})
 	);
+
+	function clear() {
+		query = '';
+		filter = 'all';
+		kind = '';
+		group = '';
+	}
+
+	$effect(() => {
+		const next = new URLSearchParams();
+		const q = query.trim();
+		if (q) next.set('q', q);
+		if (filter !== 'all') next.set('status', filter);
+		if (kind) next.set('kind', kind);
+		if (group) next.set('group', group);
+		const search = next.size ? `?${next}` : '';
+		const url = untrack(() => page.url);
+		if (search === url.search) return;
+		goto(`${url.pathname}${search}`, { replace: true, reset: false });
+	});
 
 	const refresh = debounce(() => invalidate('heron:monitors'), 500);
 	new Live(
@@ -64,6 +109,93 @@
 		},
 		true
 	);
+
+	let table = $state<HTMLTableElement>();
+	let dragging = $state<number | null>(null);
+	let snapshot: AdminMonitor[] | null = null;
+	let pending: AdminMonitor[] | null = null;
+	let timer: ReturnType<typeof setTimeout> | undefined;
+
+	const reorderable = $derived(canEdit && !filtered && monitors.length > 1);
+
+	function move(from: number, to: number) {
+		const next = monitors.slice();
+		next.splice(to, 0, ...next.splice(from, 1));
+		monitors = next;
+	}
+
+	function commit(before: AdminMonitor[], wait: number) {
+		pending ??= before;
+		clearTimeout(timer);
+		timer = setTimeout(save, wait);
+	}
+
+	async function save() {
+		const before = pending;
+		pending = null;
+		if (!before) return;
+		const ids = monitors.map((m) => m.id);
+		if (ids.every((id, i) => before[i]?.id === id)) return;
+		try {
+			await api.put('/admin/monitors/order', { ids });
+			toast.success('Order saved');
+		} catch (err) {
+			monitors = before;
+			toast.error(message(err));
+		}
+	}
+
+	function grab(e: PointerEvent, id: number) {
+		if (!reorderable || e.button !== 0) return;
+		e.preventDefault();
+		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+		snapshot = monitors.slice();
+		dragging = id;
+	}
+
+	function drag(e: PointerEvent) {
+		if (dragging == null || !table) return;
+		const rows = table.querySelectorAll<HTMLTableRowElement>('tr[data-id]');
+		let top = rows[0]?.parentElement?.getBoundingClientRect().top ?? 0;
+		for (const row of rows) {
+			const bottom = top + row.offsetHeight;
+			const inside = e.clientY >= top && e.clientY < bottom;
+			top = bottom;
+			if (!inside) continue;
+			const from = monitors.findIndex((m) => m.id === dragging);
+			const to = monitors.findIndex((m) => m.id === Number(row.dataset.id));
+			if (from !== to && from >= 0 && to >= 0) move(from, to);
+			break;
+		}
+	}
+
+	function drop() {
+		if (dragging == null) return;
+		dragging = null;
+		if (snapshot) commit(snapshot, 0);
+		snapshot = null;
+	}
+
+	function cancel() {
+		if (dragging == null) return;
+		dragging = null;
+		if (snapshot) monitors = snapshot;
+		snapshot = null;
+	}
+
+	async function nudge(e: KeyboardEvent, id: number) {
+		if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+		e.preventDefault();
+		if (!reorderable) return;
+		const from = monitors.findIndex((m) => m.id === id);
+		const to = from + (e.key === 'ArrowUp' ? -1 : 1);
+		if (from < 0 || to < 0 || to >= monitors.length) return;
+		const before = monitors.slice();
+		move(from, to);
+		commit(before, 700);
+		await tick();
+		table?.querySelector<HTMLElement>(`[data-grip="${id}"]`)?.focus();
+	}
 
 	const kpis: { status: Status; label: string; color: string }[] = [
 		{ status: 'up', label: 'Operational', color: 'var(--color-up)' },
@@ -85,7 +217,9 @@
 		<span class="text-faint">{percent(fleetUptime)} uptime in 24h</span>
 	{/snippet}
 	{#snippet actions()}
-		<a href="/admin/monitors/new" class="btn-primary"><Icon name="plus" /> New monitor</a>
+		{#if canEdit}
+			<a href="/admin/monitors/new" class="btn-primary"><Icon name="plus" /> New monitor</a>
+		{/if}
 	{/snippet}
 </PageHeader>
 
@@ -117,31 +251,72 @@
 		<span class="grid size-10 place-items-center rounded-ctl bg-sunken text-ink-2"><Icon name="activity" size={18} /></span>
 		<p class="mt-4 text-[17px] font-semibold">No monitors yet</p>
 		<p class="mt-1 max-w-sm text-ink-2">Add a website, API, database, container or game server and heron starts checking it right away.</p>
-		<a href="/admin/monitors/new" class="btn-primary mt-6"><Icon name="plus" /> Create monitor</a>
+		{#if canEdit}
+			<a href="/admin/monitors/new" class="btn-primary mt-6"><Icon name="plus" /> Create monitor</a>
+		{/if}
 	</div>
 {:else}
 	<section class="card overflow-hidden">
 		<header class="flex flex-wrap items-center gap-3 px-[22px] pt-[18px] pb-4">
 			<h2 class="text-[22px] leading-tight font-semibold tracking-[-0.015em]">All monitors</h2>
 			<span class="text-[15px] font-medium text-faint">{visible.length}</span>
-			<div class="ml-auto flex w-full items-center gap-2 sm:w-auto">
-				{#if filter !== 'all'}
-					<button class="btn-secondary btn-sm" onclick={() => (filter = 'all')}>
-						{statusLabel[filter]} <Icon name="x" size={11} />
-					</button>
+			<div class="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
+				{#if kinds.length > 1}
+					<select class="input-select h-10 w-auto min-w-0 flex-1 text-[14px] sm:flex-none" bind:value={kind} aria-label="Type">
+						<option value="">All types</option>
+						{#each kinds as k (k)}
+							<option value={k}>{kindLabel[k]}</option>
+						{/each}
+					</select>
+				{/if}
+				{#if groups.length > 1 || (groups.length === 1 && ungrouped)}
+					<select class="input-select h-10 w-auto min-w-0 flex-1 text-[14px] sm:flex-none" bind:value={group} aria-label="Group">
+						<option value="">All groups</option>
+						{#each groups as g (g)}
+							<option value={g}>{g}</option>
+						{/each}
+					</select>
 				{/if}
 				<div class="relative w-full sm:w-72">
 					<input class="input h-10 pl-10" type="search" placeholder="Search" bind:value={query} />
 					<span class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-faint"><Icon name="search" size={15} /></span>
 				</div>
 			</div>
+			{#if filtered}
+				<div class="flex w-full flex-wrap items-center gap-2">
+					{#if filter !== 'all'}
+						<button class="btn-secondary btn-sm" onclick={() => (filter = 'all')}>
+							{statusLabel[filter]} <Icon name="x" size={11} />
+						</button>
+					{/if}
+					{#if kind}
+						<button class="btn-secondary btn-sm" onclick={() => (kind = '')}>
+							{kindLabel[kind as Kind] ?? kind} <Icon name="x" size={11} />
+						</button>
+					{/if}
+					{#if group}
+						<button class="btn-secondary btn-sm" onclick={() => (group = '')}>
+							{group} <Icon name="x" size={11} />
+						</button>
+					{/if}
+					{#if query.trim()}
+						<button class="btn-secondary btn-sm max-w-60" onclick={() => (query = '')}>
+							<span class="truncate">"{query.trim()}"</span> <Icon name="x" size={11} />
+						</button>
+					{/if}
+					<button class="btn-ghost btn-sm" onclick={clear}>Clear</button>
+				</div>
+			{/if}
 		</header>
 
 		<div class="overflow-x-auto">
-			<table class="w-full">
+			<table class="w-full" bind:this={table}>
 				<thead class="border-y border-line">
 					<tr>
-						<th class="th pl-[22px]">Monitor</th>
+						{#if canEdit}
+							<th class="th w-0 pr-0 pl-3"><span class="sr-only">Order</span></th>
+						{/if}
+						<th class="th {canEdit ? 'pl-2' : 'pl-[22px]'}">Monitor</th>
 						<th class="th w-36">Status</th>
 						<th class="th hidden md:table-cell">Type</th>
 						<th class="th hidden xl:table-cell">Group</th>
@@ -152,8 +327,35 @@
 				</thead>
 				<tbody class="divide-y divide-line">
 					{#each visible as m (m.id)}
-						<tr class="relative transition-colors hover:bg-surface">
-							<td class="min-w-64 py-3.5 pr-4 pl-[22px]">
+						<tr
+							class="relative transition-colors {dragging === m.id ? 'bg-surface' : 'hover:bg-surface'}"
+							data-id={m.id}
+							animate:flip={{ duration: 180 }}
+						>
+							{#if canEdit}
+								<td class="w-0 py-3.5 pr-0 pl-3">
+									<button
+										type="button"
+										class="relative z-10 grid size-7 touch-none place-items-center rounded-lg text-faint transition-colors {reorderable
+											? dragging === m.id
+												? 'cursor-grabbing bg-sunken text-ink'
+												: 'cursor-grab hover:bg-sunken hover:text-ink'
+											: 'cursor-not-allowed opacity-40'}"
+										data-grip={m.id}
+										aria-disabled={!reorderable}
+										aria-label="Reorder {m.name}"
+										title={reorderable ? 'Drag to reorder, or Alt+Up / Alt+Down' : 'Clear search and filters to reorder'}
+										onpointerdown={(e) => grab(e, m.id)}
+										onpointermove={drag}
+										onpointerup={drop}
+										onpointercancel={cancel}
+										onkeydown={(e) => nudge(e, m.id)}
+									>
+										<Icon name="grip" size={14} />
+									</button>
+								</td>
+							{/if}
+							<td class="min-w-64 py-3.5 pr-4 {canEdit ? 'pl-2' : 'pl-[22px]'}">
 								<a href="/admin/monitors/{m.id}" class="block after:absolute after:inset-0">
 									<span class="flex items-center gap-2 text-[15px] font-semibold">
 										<span class="truncate">{m.name}</span>
@@ -188,7 +390,7 @@
 							<td class="hidden py-3.5 pr-[22px] pl-4 text-right text-[13px] whitespace-nowrap text-faint lg:table-cell">{ago(m.checked_at, clock.now)}</td>
 						</tr>
 					{:else}
-						<tr><td colspan="7" class="px-4 py-12 text-center text-ink-2">Nothing matches the filter.</td></tr>
+						<tr><td colspan={canEdit ? 8 : 7} class="px-4 py-12 text-center text-ink-2">Nothing matches the filter.</td></tr>
 					{/each}
 				</tbody>
 			</table>
