@@ -1,8 +1,10 @@
 <script lang="ts">
-	import { formatDateTime, latency } from '#lib/format.ts';
+	import { useI18n } from '#lib/i18n.svelte.ts';
 	import type { Point } from '#lib/types.ts';
 
 	let { points, height = 180 }: { points: Point[]; height?: number } = $props();
+
+	const i18n = useI18n();
 
 	let width = $state(600);
 	let hovered = $state<number | null>(null);
@@ -58,14 +60,15 @@
 
 <div class="relative" bind:clientWidth={width}>
 	{#if points.length < 2}
-		<div class="grid place-items-center text-sm text-muted" style="height: {height}px">Not enough data yet</div>
+		<div class="grid place-items-center text-sm text-muted" style="height: {height}px">{i18n.t('chart.empty')}</div>
 	{:else}
 		<svg
 			{width}
 			{height}
 			class="block touch-none select-none"
+			direction="ltr"
 			role="img"
-			aria-label="Response time chart"
+			aria-label={i18n.t('chart.label')}
 			onpointermove={track}
 			onpointerleave={() => (hovered = null)}
 		>
@@ -79,7 +82,7 @@
 			{#each ticks as tick (tick)}
 				<line x1={pad.left} x2={width - pad.right} y1={y(tick)} y2={y(tick)} stroke="var(--color-line)" stroke-dasharray={tick ? '3 4' : ''} />
 				<text x={pad.left - 8} y={y(tick)} dy="0.32em" text-anchor="end" class="fill-faint text-[10px] tabular-nums">
-					{tick >= 1000 ? `${tick / 1000}s` : `${tick}ms`}
+					{i18n.axis(tick)}
 				</text>
 			{/each}
 
@@ -98,8 +101,8 @@
 			{/if}
 
 			{#if first && last}
-				<text x={pad.left} y={height - 4} class="fill-faint text-[10px]">{formatDateTime(first.at)}</text>
-				<text x={width - pad.right} y={height - 4} text-anchor="end" class="fill-faint text-[10px]">{formatDateTime(last.at)}</text>
+				<text x={pad.left} y={height - 4} class="fill-faint text-[10px]">{i18n.dateTime(first.at)}</text>
+				<text x={width - pad.right} y={height - 4} text-anchor="end" class="fill-faint text-[10px]">{i18n.dateTime(last.at)}</text>
 			{/if}
 		</svg>
 
@@ -108,11 +111,11 @@
 				class="pointer-events-none absolute top-0 z-10 w-44 -translate-x-1/2 rounded-lg border border-line bg-surface p-2.5 text-xs shadow-lg"
 				style="left: clamp(5.5rem, {x(active.at)}px, calc(100% - 5.5rem))"
 			>
-				<div class="font-medium text-ink">{formatDateTime(active.at)}</div>
-				<div class="mt-1 flex justify-between text-muted"><span>Average</span><span class="text-ink tabular-nums">{latency(active.avg_ms)}</span></div>
-				<div class="flex justify-between text-muted"><span>Peak</span><span class="tabular-nums">{latency(active.max_ms)}</span></div>
+				<div class="font-medium text-ink">{i18n.dateTime(active.at)}</div>
+				<div class="mt-1 flex justify-between text-muted"><span>{i18n.t('chart.average')}</span><span class="text-ink tabular-nums">{i18n.latency(active.avg_ms)}</span></div>
+				<div class="flex justify-between text-muted"><span>{i18n.t('chart.peak')}</span><span class="tabular-nums">{i18n.latency(active.max_ms)}</span></div>
 				{#if active.down > 0}
-					<div class="flex justify-between text-down"><span>Failed</span><span class="tabular-nums">{active.down} of {active.checks}</span></div>
+					<div class="flex justify-between text-down"><span>{i18n.t('chart.failed')}</span><span class="tabular-nums">{i18n.t('chart.of', { down: active.down, n: active.checks })}</span></div>
 				{/if}
 			</div>
 		{/if}

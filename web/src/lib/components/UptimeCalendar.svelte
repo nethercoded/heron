@@ -1,8 +1,10 @@
 <script lang="ts">
-	import { formatDay, percent } from '#lib/format.ts';
+	import { useI18n } from '#lib/i18n.svelte.ts';
 	import type { Day } from '#lib/types.ts';
 
 	let { days, since }: { days: Day[]; since?: string } = $props();
+
+	const i18n = useI18n();
 
 	const levels = [
 		{ min: 1, tone: 'bg-up', label: '100%' },
@@ -40,7 +42,7 @@
 			const month = parse(day.date).getMonth();
 			if (month !== last) {
 				if (column > 0 || parse(day.date).getDate() <= 7) {
-					labels.push({ column, label: parse(day.date).toLocaleDateString('en', { month: 'short' }) });
+					labels.push({ column, label: i18n.monthShort(parse(day.date)) });
 				}
 				last = month;
 			}
@@ -63,6 +65,8 @@
 		return { tracked, clean, uptime: checks ? (checks - down) / checks : null };
 	});
 
+	const weekdays = $derived([1, 3, 5].map((d) => i18n.weekday(new Date(2024, 0, d))));
+
 	let hovered = $state<Day | null>(null);
 	let scroller = $state<HTMLDivElement>();
 
@@ -74,16 +78,18 @@
 <div>
 	<div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
 		<p class="text-[13px] text-muted">
-			<span class="font-semibold text-ink tabular-nums">{percent(summary.uptime)}</span> uptime over the last year ·
-			<span class="font-semibold text-ink tabular-nums">{summary.clean}</span> of {summary.tracked} tracked days without failures
+			<span class="font-semibold text-ink tabular-nums">{i18n.percent(summary.uptime)}</span>
+			{i18n.t('calendar.year')} ·
+			<span class="font-semibold text-ink tabular-nums">{summary.clean}</span>
+			{i18n.t('calendar.clean', { n: summary.tracked })}
 		</p>
 		{#if since}
-			<p class="text-xs text-faint">Monitoring since {formatDay(since)}</p>
+			<p class="text-xs text-faint">{i18n.t('calendar.since', { date: i18n.day(since) })}</p>
 		{/if}
 	</div>
 
 	<div class="rounded-md border border-line p-3">
-		<div class="overflow-x-auto" bind:this={scroller}>
+		<div class="overflow-x-auto" dir="ltr" bind:this={scroller}>
 			<div class="inline-grid grid-cols-[auto_1fr] gap-x-2">
 				<div></div>
 				<div class="relative h-4 text-[10px] text-muted">
@@ -93,7 +99,7 @@
 				</div>
 
 				<div class="grid grid-rows-7 gap-[3px] text-[10px] leading-[11px] text-muted">
-					<span></span><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span>
+					<span></span><span>{weekdays[0]}</span><span></span><span>{weekdays[1]}</span><span></span><span>{weekdays[2]}</span><span></span>
 				</div>
 
 				<div class="flex gap-[3px]" role="presentation" onmouseleave={() => (hovered = null)}>
@@ -104,7 +110,7 @@
 									<button
 										type="button"
 										class="size-[11px] rounded-[2px] {tone(day)} {hovered === day ? 'ring-2 ring-ink/60' : ''}"
-										aria-label="{formatDay(day.date)}: {percent(day.uptime)}"
+										aria-label="{i18n.day(day.date)}: {i18n.percent(day.uptime)}"
 										onmouseenter={() => (hovered = day)}
 										onfocus={() => (hovered = day)}
 									></button>
@@ -121,22 +127,22 @@
 		<div class="mt-3 flex flex-wrap items-center justify-between gap-3 text-[11px] text-muted">
 			<span class="min-h-4">
 				{#if hovered}
-					<span class="font-medium text-ink">{formatDay(hovered.date)}</span>
+					<span class="font-medium text-ink">{i18n.day(hovered.date)}</span>
 					{#if hovered.uptime == null}
-						· no data
+						· {i18n.t('calendar.empty')}
 					{:else}
-						· {percent(hovered.uptime, 3)} · {hovered.down} failed of {hovered.checks} checks
+						· {i18n.percent(hovered.uptime, 3)} · {i18n.t('calendar.failed', { down: hovered.down, n: hovered.checks })}
 					{/if}
 				{:else}
-					Hover a day for details
+					{i18n.t('calendar.hint')}
 				{/if}
 			</span>
 			<span class="flex items-center gap-1.5">
-				Worse
+				{i18n.t('calendar.worse')}
 				{#each [...levels].reverse() as level (level.label)}
 					<span class="size-[11px] rounded-[2px] {level.tone}" title={level.label}></span>
 				{/each}
-				Better
+				{i18n.t('calendar.better')}
 			</span>
 		</div>
 	</div>

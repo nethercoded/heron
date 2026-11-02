@@ -71,7 +71,11 @@
 </script>
 
 <script lang="ts">
-	let { water = '#4cc3f5', class: className = '' }: { water?: string; class?: string } = $props();
+	let {
+		water = '#4cc3f5',
+		mirror = false,
+		class: className = ''
+	}: { water?: string; mirror?: boolean; class?: string } = $props();
 
 	let canvas = $state<HTMLCanvasElement>();
 
@@ -296,7 +300,7 @@
 
 		const onMove = (e: PointerEvent) => {
 			const rect = el.getBoundingClientRect();
-			const x = e.clientX - rect.left;
+			const x = mirror ? rect.right - e.clientX : e.clientX - rect.left;
 			const y = e.clientY - rect.top;
 			mouse = !reduced && x >= 0 && y >= 0 && x <= rect.width && y <= rect.height ? { x, y } : { x: -1e4, y: -1e4 };
 		};
@@ -315,4 +319,4 @@
 	});
 </script>
 
-<canvas bind:this={canvas} class={className} aria-hidden="true"></canvas>
+<canvas bind:this={canvas} class={className} style:transform={mirror ? 'scaleX(-1)' : undefined} aria-hidden="true"></canvas>

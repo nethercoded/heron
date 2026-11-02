@@ -1,8 +1,10 @@
 <script lang="ts">
+	import { useI18n } from '#lib/i18n.svelte.ts';
 	import type { Range } from '#lib/types.ts';
 
 	let { value = $bindable() }: { value: Range } = $props();
 
+	const i18n = useI18n();
 	const ranges: Range[] = ['24h', '7d', '30d', '90d'];
 </script>
 
@@ -15,7 +17,7 @@
 			class="rounded-full px-3 py-1 font-mono text-xs font-medium transition-colors {value === range ? 'bg-ink text-canvas' : 'text-muted hover:text-ink'}"
 			onclick={() => (value = range)}
 		>
-			{range}
+			{i18n.range(range)}
 		</button>
 	{/each}
 </div>

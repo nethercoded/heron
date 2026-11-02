@@ -1,9 +1,12 @@
 <script lang="ts">
 	import Icon from '#lib/components/Icon.svelte';
 	import IncidentCard from '#lib/components/IncidentCard.svelte';
+	import { useI18n } from '#lib/i18n.svelte.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+
+	const i18n = useI18n();
 </script>
 
 <svelte:head>
@@ -11,7 +14,7 @@
 </svelte:head>
 
 <a href="/incidents" class="mb-6 inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
-	<Icon name="back" size={14} /> Incident history
+	<Icon name="back" size={14} class="rtl:-scale-x-100" /> {i18n.t('history.title')}
 </a>
 
 <IncidentCard incident={data.incident} expanded />
