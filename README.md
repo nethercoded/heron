@@ -1,97 +1,128 @@
 <p align="center">
-  <img src="web/static/favicon.svg" width="72" alt="heron">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.svg">
+    <img src="docs/logo-light.svg" width="260" alt="heron">
+  </picture>
 </p>
 
-<h1 align="center">heron</h1>
-
 <p align="center">
-  A small, fast, self-hosted status page and uptime monitor.<br>
-  One binary. One SQLite file. Nothing else to run.
+  A self-hosted status page and uptime monitor.<br>
+  One small binary, one SQLite file, and a page your users will actually like looking at.
 </p>
 
 <p align="center">
   <a href="https://github.com/nethercode/heron/actions/workflows/ci.yml"><img src="https://github.com/nethercode/heron/actions/workflows/ci.yml/badge.svg" alt="ci"></a>
-  <a href="https://github.com/nethercode/heron/releases"><img src="https://img.shields.io/github/v/release/nethercode/heron" alt="release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/nethercode/heron" alt="license"></a>
+  <a href="https://github.com/nethercode/heron/releases"><img src="https://img.shields.io/github/v/release/nethercode/heron?color=000" alt="release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/nethercode/heron?color=000" alt="license"></a>
 </p>
 
----
+<p align="center">
+  <img src="docs/status.png" width="860" alt="The public status page">
+</p>
 
-heron watches your websites, APIs, servers and cron jobs, keeps the history, and shows it on a clean public status page. When something breaks it opens an incident and pings you in Telegram or any webhook. When it recovers, it closes the incident and tells you how long it was down.
+## Why heron
 
-## Features
+I wanted a status page that I could drop on a cheap VPS and forget about. Most tools I tried either needed a database server, ate a few hundred megabytes of RAM, or looked like an admin template from 2014. heron is my answer to that.
 
-- **Checks**: HTTP(S) with status codes, keywords, headers, body and TLS certificate expiry; TCP; ICMP ping; DNS records; gRPC health; Postgres (runs a real query); Redis; SMTP with STARTTLS; IMAP; Docker container state and healthchecks; Minecraft and Steam game servers with player counts; push heartbeats for cron jobs and backups
-- **Public page** with 90-day uptime bars, a year-long uptime calendar, response time charts, incident history and live updates over Server-Sent Events
-- **Incidents** opened and resolved automatically, plus manual incidents with a timeline of updates
-- **Maintenance windows**, one-off or repeating daily or weekly, that mute alerts and show up on the status page a week in advance
-- **Badges and a widget**: SVG status, uptime and response time badges for READMEs, and a drop-in script that shows a notice on your own site during incidents
-- **Alerts** to Telegram (including forum topics) and signed webhooks, with retries and backoff
-- **Admin panel** for monitors, incidents, notification channels and page settings
-- Retries before alerting, degraded thresholds for slow responses, private monitors, groups
-- Dark mode, mobile-friendly, no tracking, no external requests from the browser
-- Single static binary with the UI embedded, pure Go SQLite (no CGO), graceful shutdown, hardened systemd unit
+It checks your sites, APIs, databases, containers and game servers, keeps a year of history, opens incidents when something breaks and closes them when it comes back. The public page updates live, so people watching it during an outage see the moment things recover.
 
-## Install
+## What it does
 
-### One-liner (Linux with systemd)
+**Checks.** HTTP and HTTPS with status codes, keywords, custom headers and certificate expiry. TCP ports, ping and DNS records. Postgres (it runs a real query), Redis, SMTP with STARTTLS, IMAP, Docker containers and their healthchecks, gRPC health, Minecraft and Steam servers with player counts. Push monitors for cron jobs and backups that call heron instead of the other way around.
+
+**Status page.** 90 day uptime bars, a GitHub style calendar for the whole year, response time charts and an incident timeline. Live updates over Server-Sent Events, no refresh needed.
+
+**Incidents and maintenance.** Incidents open and resolve on their own, and you can write updates by hand. Maintenance windows can be one-off or repeat every day or week. While one is running, alerts stay quiet and the page tells visitors what is going on.
+
+**Alerts.** Telegram (topics in forum groups work too) and signed webhooks, with retries. A monitor only counts as down after the number of failed checks you choose, so a single hiccup does not wake you up.
+
+**Extras.** SVG badges for your README, a small script that shows a notice on your own website during an outage, and a dark admin panel that matches the public page.
+
+<p align="center">
+  <img src="docs/monitor.png" width="860" alt="A monitor with its response time chart and uptime calendar">
+</p>
+
+## Getting it running
+
+You need a Linux server and, ideally, a domain or subdomain pointed at it with an A record.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/nethercode/heron/main/deploy/install.sh | sudo sh
 ```
 
-The script downloads the latest release, verifies its checksum, creates a `heron` system user, writes `/etc/heron/heron.toml` and starts the service. Open `http://your-server:8080/admin` and create the administrator account. The form asks for a one-time setup code that heron prints to its log on startup, so nobody else can claim a fresh install:
+The script downloads the latest release, checks its checksum, creates a `heron` system user and starts the service. At the end it prints a one-time setup code. Open `http://your-server:8080` and the installer takes it from there.
+
+<p align="center">
+  <img src="docs/install.png" width="860" alt="The web installer">
+</p>
+
+The installer walks you through seven short steps:
+
+1. **Setup code.** Proves you are the one who owns the server, so nobody can grab a fresh install before you do.
+2. **Domain.** Enter something like `status.example.com`. heron checks that the record points at the server, gets a certificate from Let's Encrypt, starts serving HTTPS on ports 80 and 443 and moves you over to the new address. If you already run nginx or Caddy, pick the reverse proxy option and heron will only remember the address.
+3. **Administrator.** Your username and password.
+4. **Status page.** Title, description and an optional logo.
+5. **First monitor.** Any URL you care about.
+6. **Alerts.** A Telegram bot token and chat. heron sends a test message straight away.
+7. **Done.**
+
+Everything except the setup code and the account can be skipped and changed later in the panel.
+
+Lost the code? It is in the log:
 
 ```sh
 journalctl -u heron | grep setup_code
 ```
 
-With Docker, run `docker logs heron`. You can also skip the form and create the account from the shell with `heron user create -u admin`.
-
 ### Docker
 
 ```sh
 docker run -d --name heron \
-  -p 8080:8080 \
-  -v heron-data:/data \
+  -p 80:80 -p 443:443 -p 8080:8080 \
+  --sysctl net.ipv4.ip_unprivileged_port_start=0 \
   --cap-add NET_RAW \
-  -e HERON_PUBLIC_URL=https://status.example.com \
+  -v heron-data:/data \
   ghcr.io/nethercode/heron:latest
+
+docker logs heron | grep setup_code
 ```
 
-Or use the bundled [`compose.yaml`](compose.yaml).
+There is also a [`compose.yaml`](compose.yaml) in the repository.
 
 ### From source
 
-Requires Go 1.27+, Node 24+ and pnpm.
+You need Go 1.27 or newer, Node 24 or newer and pnpm.
 
 ```sh
 git clone https://github.com/nethercode/heron && cd heron
-task build        # or: (cd web && pnpm install && pnpm build) && go build ./cmd/heron
+cd web && pnpm install && pnpm build && cd ..
+go build ./cmd/heron
 ./heron serve
 ```
 
+If you have [Task](https://taskfile.dev) installed, `task build` does the same.
+
 ## Configuration
 
-heron reads `heron.toml` from the working directory, from `$HERON_CONFIG`, or from `-config`. Every key can also be set through an environment variable.
+Most things are set in the panel. The few that belong to the server live in `heron.toml` (next to the binary, in `$HERON_CONFIG`, or passed with `-config`). Every key can also come from an environment variable.
 
-| Key               | Env                     | Default   | Description                                                    |
-| ----------------- | ----------------------- | --------- | -------------------------------------------------------------- |
-| `listen`          | `HERON_LISTEN`          | `:8080`   | Address to listen on                                           |
-| `data_dir`        | `HERON_DATA_DIR`        | `./data`  | Where the SQLite database lives                                |
-| `public_url`      | `HERON_PUBLIC_URL`      |           | Public address, used in alerts and to enable secure cookies    |
-| `timezone`        | `HERON_TIMEZONE`        | `UTC`     | Timezone for daily uptime bars                                 |
-| `retention_days`  | `HERON_RETENTION_DAYS`  | `7`       | How long raw check results are kept; hourly rollups stay a year |
-| `trusted_proxies` | `HERON_TRUSTED_PROXIES` |           | Proxies allowed to set `X-Forwarded-For`                       |
-| `icmp_privileged` | `HERON_ICMP_PRIVILEGED` | `false`   | Use raw sockets for ping (needs `CAP_NET_RAW`)                 |
-| `log_level`       | `HERON_LOG_LEVEL`       | `info`    | `debug`, `info`, `warn` or `error`                             |
-| `log_format`      | `HERON_LOG_FORMAT`      | `text`    | `text` or `json`                                               |
+| Key               | Variable                | Default  | What it does                                                    |
+| ----------------- | ----------------------- | -------- | --------------------------------------------------------------- |
+| `listen`          | `HERON_LISTEN`          | `:8080`  | Address for plain HTTP, handy for local access and proxies      |
+| `data_dir`        | `HERON_DATA_DIR`        | `./data` | Where the database and certificates are stored                  |
+| `public_url`      | `HERON_PUBLIC_URL`      |          | Address used in alerts when no domain is set in the panel       |
+| `timezone`        | `HERON_TIMEZONE`        | `UTC`    | Which midnight the daily uptime bars use                        |
+| `retention_days`  | `HERON_RETENTION_DAYS`  | `7`      | How long raw checks are kept. Hourly totals stay for a year     |
+| `trusted_proxies` | `HERON_TRUSTED_PROXIES` |          | Proxies allowed to set `X-Forwarded-For`                        |
+| `icmp_privileged` | `HERON_ICMP_PRIVILEGED` | `false`  | Use raw sockets for ping, needs `CAP_NET_RAW`                    |
+| `log_level`       | `HERON_LOG_LEVEL`       | `info`   | `debug`, `info`, `warn` or `error`                              |
+| `log_format`      | `HERON_LOG_FORMAT`      | `text`   | `text` or `json`                                                |
 
-See [`heron.example.toml`](heron.example.toml).
+There is an example in [`heron.example.toml`](heron.example.toml).
 
-### Behind a reverse proxy
+### Behind your own proxy
 
-heron streams live updates, so turn off response buffering for `/api/stream`:
+Point the proxy at port 8080, turn off buffering so live updates get through, and add the proxy to `trusted_proxies` so login limits apply per visitor and not to everyone at once.
 
 ```nginx
 location / {
@@ -102,48 +133,43 @@ location / {
 }
 ```
 
-With Caddy it is just `reverse_proxy 127.0.0.1:8080`.
+With Caddy it is a single line: `reverse_proxy 127.0.0.1:8080`.
 
 ## Push monitors
 
-Create a monitor of type **Push** and heron gives you a URL. Call it from your job:
+Create a monitor of type Push and heron gives you a URL. Call it at the end of your job:
 
 ```sh
 0 3 * * * /usr/local/bin/backup.sh && curl -fsS -m 10 --retry 3 https://status.example.com/api/push/<token>
 ```
 
-If no heartbeat arrives within the interval plus the grace period, the monitor goes down. You can also report failures and timings explicitly:
+If no call arrives within the interval plus a grace period, the monitor goes down. A job can also report a failure or its own timing:
 
 ```
 /api/push/<token>?status=down&msg=disk%20full
 /api/push/<token>?status=up&ping=532
 ```
 
-## Badges and widget
+## Badges and the widget
 
 ```markdown
 [![Status](https://status.example.com/badge)](https://status.example.com)
-[![API](https://status.example.com/badge/api)](https://status.example.com/monitor/api)
-[![Uptime](https://status.example.com/badge/api/uptime?period=30d)](https://status.example.com/monitor/api)
+[![API](https://status.example.com/badge/api/uptime?period=30d)](https://status.example.com/monitor/api)
 ```
 
-Add `?label=` to change the left side. Response time lives at `/badge/<slug>/response`.
+Use `/badge/<slug>` for a single monitor, `/badge/<slug>/uptime?period=24h|7d|30d|90d` for uptime and `/badge/<slug>/response` for the last response time. Add `?label=` to change the text on the left.
 
-The widget stays invisible while everything is fine and shows a small card when there is an active incident or maintenance:
+The widget stays hidden while everything is fine and shows a small card on your site when something is wrong or maintenance is running:
 
 ```html
 <script src="https://status.example.com/widget.js" data-position="bottom-right" async></script>
 ```
 
-Options: `data-position` (`bottom-right`, `bottom-left`, `top-right`, `top-left`), `data-upcoming="true"` to announce planned work in advance, `data-refresh` in seconds. It reads `/api/summary`, which is safe to call cross-origin.
-
-## Docker monitors
-
-Docker checks talk to the Docker API, `unix:///var/run/docker.sock` by default. Give heron read access by adding its user to the `docker` group, or put a read-only socket proxy in front and set the monitor's Docker host to `tcp://proxy:2375`.
+You can move it with `data-position`, announce planned work early with `data-upcoming="true"` and change how often it refreshes with `data-refresh` (in seconds).
 
 ## Webhooks
 
-Webhook channels receive a JSON `POST` on every state change:
+Webhook channels receive a JSON `POST` every time a monitor goes down or comes back:
 
 ```json
 {
@@ -156,26 +182,30 @@ Webhook channels receive a JSON `POST` on every state change:
 }
 ```
 
-When a signing secret is set, every request carries `X-Heron-Timestamp` and `X-Heron-Signature: sha256=<hex>`, where the signature is an HMAC-SHA256 of `timestamp + "." + body`.
+If you set a secret, each request also carries `X-Heron-Timestamp` and `X-Heron-Signature: sha256=<hex>`, an HMAC of `timestamp + "." + body`.
 
-## CLI
+## Docker monitors
+
+These talk to the Docker API, by default through `/var/run/docker.sock`. Add the `heron` user to the `docker` group, or put a read-only socket proxy in front and set the monitor's Docker host to `tcp://proxy:2375`.
+
+## Command line
 
 ```
 heron serve                 start the server
-heron user create -u name   create an administrator (password from stdin or prompt)
-heron user passwd -u name   reset a password and sign out all sessions
-heron version
+heron user create -u name   create an administrator without the installer
+heron user passwd -u name   reset a password and sign out every session
+heron version               print the version
 ```
 
-## Development
+## Working on heron
 
 ```sh
-task dev     # Go backend on :8080 and Vite on :5173 with a proxy to it
+task dev     # backend on :8080 and the Vite dev server on :5173
 task test    # go test -race ./...
-task lint    # golangci-lint, svelte-check, biome
+task lint    # golangci-lint, svelte-check and biome
 ```
 
-The backend lives in `internal/`: `monitor` (checkers), `scheduler` (one goroutine per monitor, retries, push deadlines), `engine` (results, incidents, alerts, live events), `store` (SQLite), `notify`, `auth` and `httpapi`. The frontend is a SvelteKit app in `web/`, built to static files and embedded into the binary.
+The Go code lives in `internal/`. `monitor` has the checks, `scheduler` runs one goroutine per monitor, `engine` turns results into incidents, alerts and live events, `site` handles domains and certificates, and `store` wraps SQLite. The interface is a SvelteKit app in `web/` that gets built to static files and embedded into the binary.
 
 ## License
 
