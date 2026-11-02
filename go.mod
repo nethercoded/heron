@@ -1,4 +1,4 @@
-module github.com/nethercode/heron
+module github.com/nethercoded/heron
 
 go 1.27.3
 

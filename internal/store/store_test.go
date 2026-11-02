@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nethercode/heron/internal/maintenance"
-	"github.com/nethercode/heron/internal/monitor"
-	"github.com/nethercode/heron/internal/notify"
+	"github.com/nethercoded/heron/internal/maintenance"
+	"github.com/nethercoded/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/notify"
 )
 
 func open(t *testing.T) *Store {

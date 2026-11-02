@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nethercode/heron/internal/store"
+	"github.com/nethercoded/heron/internal/store"
 )
 
 type userKey struct{}

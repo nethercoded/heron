@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/nethercode/heron/internal/site"
+	"github.com/nethercoded/heron/internal/site"
 )
 
 type Site interface {

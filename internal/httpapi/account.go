@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nethercode/heron/internal/auth"
-	"github.com/nethercode/heron/internal/store"
+	"github.com/nethercoded/heron/internal/auth"
+	"github.com/nethercoded/heron/internal/store"
 )
 
 type authStateDTO struct {

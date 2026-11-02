@@ -26,8 +26,8 @@ linters:
         - (*database/sql.DB).Close
         - (*database/sql.Rows).Close
         - (*github.com/jackc/pgx/v5.Conn).Close
-        - (*github.com/nethercode/heron/internal/store.Store).Close
-        - (*github.com/nethercode/heron/internal/monitor.session).Close
+        - (*github.com/nethercoded/heron/internal/store.Store).Close
+        - (*github.com/nethercoded/heron/internal/monitor.session).Close
         - (net.Conn).Close
         - (*os.File).Close
         - fmt.Fprint
@@ -53,4 +53,4 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/nethercode/heron
+        - github.com/nethercoded/heron

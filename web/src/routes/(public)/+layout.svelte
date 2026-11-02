@@ -115,7 +115,7 @@
 
 	<footer class="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-3 px-4 py-8 text-xs text-faint sm:flex-row sm:px-6">
 		<span>{info.footer || `© ${new Date().getFullYear()} ${info.title}`}</span>
-		<a href="https://github.com/nethercode/heron" class="flex items-center gap-2 hover:text-muted" rel="noopener" target="_blank">
+		<a href="https://github.com/nethercoded/heron" class="flex items-center gap-2 hover:text-muted" rel="noopener" target="_blank">
 			<Logo size={14} /> heron <Icon name="external" size={11} />
 		</a>
 	</footer>

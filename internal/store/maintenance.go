@@ -6,7 +6,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/nethercode/heron/internal/maintenance"
+	"github.com/nethercoded/heron/internal/maintenance"
 )
 
 func (s *Store) MaintenanceWindows(ctx context.Context) ([]maintenance.Window, error) {

@@ -10,7 +10,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/nethercode/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/monitor"
 )
 
 type recorder struct {

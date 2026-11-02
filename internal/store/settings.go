@@ -5,7 +5,7 @@ import (
 	"encoding/json/v2"
 	"errors"
 
-	"github.com/nethercode/heron/internal/site"
+	"github.com/nethercoded/heron/internal/site"
 )
 
 type Page struct {

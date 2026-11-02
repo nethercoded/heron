@@ -10,12 +10,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/nethercode/heron/internal/broker"
-	"github.com/nethercode/heron/internal/maintenance"
-	"github.com/nethercode/heron/internal/monitor"
-	"github.com/nethercode/heron/internal/notify"
-	"github.com/nethercode/heron/internal/scheduler"
-	"github.com/nethercode/heron/internal/store"
+	"github.com/nethercoded/heron/internal/broker"
+	"github.com/nethercoded/heron/internal/maintenance"
+	"github.com/nethercoded/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/notify"
+	"github.com/nethercoded/heron/internal/scheduler"
+	"github.com/nethercoded/heron/internal/store"
 )
 
 type EventType string

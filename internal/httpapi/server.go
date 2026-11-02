@@ -8,12 +8,12 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/nethercode/heron/internal/auth"
-	"github.com/nethercode/heron/internal/engine"
-	"github.com/nethercode/heron/internal/monitor"
-	"github.com/nethercode/heron/internal/notify"
-	"github.com/nethercode/heron/internal/site"
-	"github.com/nethercode/heron/internal/store"
+	"github.com/nethercoded/heron/internal/auth"
+	"github.com/nethercoded/heron/internal/engine"
+	"github.com/nethercoded/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/notify"
+	"github.com/nethercoded/heron/internal/site"
+	"github.com/nethercoded/heron/internal/store"
 )
 
 type Scheduler interface {

@@ -1,6 +1,6 @@
 [Unit]
 Description=heron status page
-Documentation=https://github.com/nethercode/heron
+Documentation=https://github.com/nethercoded/heron
 After=network-online.target
 Wants=network-online.target
 

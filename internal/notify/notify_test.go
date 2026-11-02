@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nethercode/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/monitor"
 )
 
 var sample = Message{

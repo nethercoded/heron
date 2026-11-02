@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nethercode/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/monitor"
 )
 
 const monitorColumns = `id, slug, name, description, group_name, kind, target, interval_s, timeout_s, retries,

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/nethercode/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/monitor"
 )
 
 func (s *Server) listMonitors(w http.ResponseWriter, r *http.Request) error {

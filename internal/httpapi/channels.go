@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nethercode/heron/internal/monitor"
-	"github.com/nethercode/heron/internal/notify"
-	"github.com/nethercode/heron/internal/store"
+	"github.com/nethercoded/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/notify"
+	"github.com/nethercoded/heron/internal/store"
 )
 
 func (s *Server) listChannels(w http.ResponseWriter, r *http.Request) error {

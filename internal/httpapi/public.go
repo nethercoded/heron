@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nethercode/heron/internal/engine"
-	"github.com/nethercode/heron/internal/monitor"
-	"github.com/nethercode/heron/internal/store"
+	"github.com/nethercoded/heron/internal/engine"
+	"github.com/nethercoded/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/store"
 )
 
 type overall string

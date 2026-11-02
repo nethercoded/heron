@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-REPO="nethercode/heron"
+REPO="nethercoded/heron"
 BIN_DIR="/usr/local/bin"
 CONF_DIR="/etc/heron"
 UNIT="/etc/systemd/system/heron.service"

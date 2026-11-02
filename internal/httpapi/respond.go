@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/nethercode/heron/internal/monitor"
-	"github.com/nethercode/heron/internal/store"
+	"github.com/nethercoded/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/store"
 )
 
 const maxRequestBody = 1 << 20

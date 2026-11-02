@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nethercode/heron/internal/maintenance"
-	"github.com/nethercode/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/maintenance"
+	"github.com/nethercoded/heron/internal/monitor"
 )
 
 type maintenanceInput struct {

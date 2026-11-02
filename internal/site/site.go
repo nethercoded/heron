@@ -17,7 +17,7 @@ import (
 
 	"golang.org/x/crypto/acme/autocert"
 
-	"github.com/nethercode/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/monitor"
 )
 
 type Mode string

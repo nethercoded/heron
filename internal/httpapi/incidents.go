@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nethercode/heron/internal/monitor"
-	"github.com/nethercode/heron/internal/store"
+	"github.com/nethercoded/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/store"
 )
 
 func (s *Server) listIncidents(w http.ResponseWriter, r *http.Request) error {

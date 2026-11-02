@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/nethercode/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/monitor"
 )
 
 type Uptime struct {

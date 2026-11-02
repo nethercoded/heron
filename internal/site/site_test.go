@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nethercode/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/monitor"
 )
 
 type memStore struct{ s Settings }

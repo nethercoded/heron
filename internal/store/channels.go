@@ -5,7 +5,7 @@ import (
 	"encoding/json/v2"
 	"time"
 
-	"github.com/nethercode/heron/internal/notify"
+	"github.com/nethercoded/heron/internal/notify"
 )
 
 const channelColumns = `id, name, kind, config, enabled, created_at, updated_at`

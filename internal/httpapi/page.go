@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/nethercode/heron/internal/monitor"
-	"github.com/nethercode/heron/internal/store"
+	"github.com/nethercoded/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/store"
 )
 
 func (s *Server) getPage(w http.ResponseWriter, r *http.Request) error {

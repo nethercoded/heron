@@ -11,9 +11,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nethercode/heron/actions/workflows/ci.yml"><img src="https://github.com/nethercode/heron/actions/workflows/ci.yml/badge.svg" alt="ci"></a>
-  <a href="https://github.com/nethercode/heron/releases"><img src="https://img.shields.io/github/v/release/nethercode/heron?color=000" alt="release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/nethercode/heron?color=000" alt="license"></a>
+  <a href="https://github.com/nethercoded/heron/actions/workflows/ci.yml"><img src="https://github.com/nethercoded/heron/actions/workflows/ci.yml/badge.svg" alt="ci"></a>
+  <a href="https://github.com/nethercoded/heron/releases"><img src="https://img.shields.io/github/v/release/nethercoded/heron?color=000" alt="release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/nethercoded/heron?color=000" alt="license"></a>
 </p>
 
 <p align="center">
@@ -47,7 +47,7 @@ It checks your sites, APIs, databases, containers and game servers, keeps a year
 You need a Linux server and, ideally, a domain or subdomain pointed at it with an A record.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/nethercode/heron/main/deploy/install.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/nethercoded/heron/main/deploy/install.sh | sudo sh
 ```
 
 The script downloads the latest release, checks its checksum, creates a `heron` system user and starts the service. At the end it prints a one-time setup code. Open `http://your-server:8080` and the installer takes it from there.
@@ -82,7 +82,7 @@ docker run -d --name heron \
   --sysctl net.ipv4.ip_unprivileged_port_start=0 \
   --cap-add NET_RAW \
   -v heron-data:/data \
-  ghcr.io/nethercode/heron:latest
+  ghcr.io/nethercoded/heron:latest
 
 docker logs heron | grep setup_code
 ```
@@ -94,7 +94,7 @@ There is also a [`compose.yaml`](compose.yaml) in the repository.
 You need Go 1.27 or newer, Node 24 or newer and pnpm.
 
 ```sh
-git clone https://github.com/nethercode/heron && cd heron
+git clone https://github.com/nethercoded/heron && cd heron
 cd web && pnpm install && pnpm build && cd ..
 go build ./cmd/heron
 ./heron serve

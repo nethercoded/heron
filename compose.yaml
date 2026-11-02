@@ -1,6 +1,6 @@
 services:
   heron:
-    image: ghcr.io/nethercode/heron:latest
+    image: ghcr.io/nethercoded/heron:latest
     build: .
     restart: unless-stopped
     ports:

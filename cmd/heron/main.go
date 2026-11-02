@@ -22,17 +22,17 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/nethercode/heron/internal/auth"
-	"github.com/nethercode/heron/internal/config"
-	"github.com/nethercode/heron/internal/engine"
-	"github.com/nethercode/heron/internal/httpapi"
-	"github.com/nethercode/heron/internal/maintenance"
-	"github.com/nethercode/heron/internal/monitor"
-	"github.com/nethercode/heron/internal/notify"
-	"github.com/nethercode/heron/internal/scheduler"
-	"github.com/nethercode/heron/internal/site"
-	"github.com/nethercode/heron/internal/store"
-	"github.com/nethercode/heron/web"
+	"github.com/nethercoded/heron/internal/auth"
+	"github.com/nethercoded/heron/internal/config"
+	"github.com/nethercoded/heron/internal/engine"
+	"github.com/nethercoded/heron/internal/httpapi"
+	"github.com/nethercoded/heron/internal/maintenance"
+	"github.com/nethercoded/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/notify"
+	"github.com/nethercoded/heron/internal/scheduler"
+	"github.com/nethercoded/heron/internal/site"
+	"github.com/nethercoded/heron/internal/store"
+	"github.com/nethercoded/heron/web"
 )
 
 var version = "dev"
@@ -126,7 +126,7 @@ func serve(args []string) error {
 	defer db.Close()
 
 	ver := buildVersion()
-	userAgent := "heron/" + ver + " (+https://github.com/nethercode/heron)"
+	userAgent := "heron/" + ver + " (+https://github.com/nethercoded/heron)"
 
 	dispatcher := notify.NewDispatcher(notify.Factory{
 		Client:    &http.Client{Timeout: 15 * time.Second},

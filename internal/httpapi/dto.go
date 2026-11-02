@@ -3,9 +3,9 @@ package httpapi
 import (
 	"time"
 
-	"github.com/nethercode/heron/internal/monitor"
-	"github.com/nethercode/heron/internal/notify"
-	"github.com/nethercode/heron/internal/store"
+	"github.com/nethercoded/heron/internal/monitor"
+	"github.com/nethercoded/heron/internal/notify"
+	"github.com/nethercoded/heron/internal/store"
 )
 
 type stamp time.Time

@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/nethercode/heron/internal/store"
+	"github.com/nethercoded/heron/internal/store"
 )
 
 const (
