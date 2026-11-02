@@ -4,6 +4,7 @@
 	import Logo from '#lib/components/Logo.svelte';
 	import NavList, { type NavGroup } from '#lib/components/NavList.svelte';
 	import { debounce, Live } from '#lib/live.svelte.ts';
+	import { roleLabel } from '#lib/team.ts';
 	import { toast } from '#lib/toast.svelte.ts';
 	import { goto, invalidate } from '$app/navigation';
 	import { page } from '$app/state';
@@ -37,7 +38,11 @@
 		{
 			title: 'Configuration',
 			items: [
-				{ href: '/admin/channels', label: 'Notifications', icon: 'bell' },
+				...(data.user.role === 'viewer'
+					? []
+					: [{ href: '/admin/channels', label: 'Notifications', icon: 'bell' } as const]),
+				{ href: '/admin/people', label: 'People', icon: 'users' },
+				{ href: '/admin/audit', label: 'Audit log', icon: 'history' },
 				{ href: '/admin/settings', label: 'Settings', icon: 'settings' }
 			]
 		}
@@ -107,7 +112,7 @@
 				<span class="grid size-9 place-items-center rounded-ctl bg-raised text-[13px] font-bold uppercase">{data.user.username.slice(0, 2)}</span>
 				<div class="min-w-0">
 					<div class="truncate text-[14px] leading-tight font-semibold">{data.user.username}</div>
-					<div class="truncate text-[12.5px] text-faint">administrator</div>
+					<div class="truncate text-[12.5px] text-faint">{roleLabel[data.user.role].toLowerCase()}</div>
 				</div>
 				<button
 					onclick={logout}

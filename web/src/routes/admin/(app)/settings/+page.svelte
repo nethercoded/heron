@@ -2,9 +2,12 @@
 	import { untrack } from 'svelte';
 	import { ApiError, api, message } from '#lib/api.ts';
 	import Field from '#lib/components/Field.svelte';
+	import MetricsSettings from '#lib/components/MetricsSettings.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
+	import SecuritySettings from '#lib/components/SecuritySettings.svelte';
 	import Snippet from '#lib/components/Snippet.svelte';
 	import { badgeMarkdown, widgetSnippet } from '#lib/embed.ts';
+	import { canEdit } from '#lib/team.ts';
 	import { toast } from '#lib/toast.svelte.ts';
 	import type { Page, SiteSettings } from '#lib/types.ts';
 	import { goto } from '$app/navigation';
@@ -12,6 +15,9 @@
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+
+	const owner = $derived(data.user.role === 'owner');
+	const editor = $derived(canEdit(data.user.role));
 
 	const origin = $derived(route.url.origin);
 	const widget = $derived(widgetSnippet(origin));
@@ -87,6 +93,7 @@
 <PageHeader title="Settings" />
 
 <div class="space-y-6">
+	{#if owner}
 	<form class="card p-5 sm:p-6" onsubmit={saveSite} novalidate>
 		<h2 class="font-semibold">Domain</h2>
 		<p class="mb-5 text-sm text-muted">
@@ -112,6 +119,9 @@
 			<button class="btn-primary" disabled={siteBusy}>{siteBusy ? 'Checking…' : 'Save domain'}</button>
 		</div>
 	</form>
+	{/if}
+
+	{#if editor}
 
 	<form class="card p-5 sm:p-6" onsubmit={savePage} novalidate>
 		<h2 class="font-semibold">Status page</h2>
@@ -160,6 +170,11 @@
 			<code class="kbd">data-upcoming="true"</code> to announce maintenance in advance, <code class="kbd">data-refresh</code> in seconds.
 		</p>
 	</section>
+
+		<MetricsSettings {origin} />
+	{/if}
+
+	<SecuritySettings twoFactor={data.user.two_factor} />
 
 	<form class="card p-5 sm:p-6" onsubmit={changePassword} novalidate>
 		<h2 class="font-semibold">Password</h2>

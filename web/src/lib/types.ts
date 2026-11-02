@@ -230,9 +230,56 @@ export interface SiteSettings {
 	reachable: boolean;
 }
 
+export type Role = 'owner' | 'admin' | 'viewer';
+
+export interface User {
+	id: number;
+	username: string;
+	role: Role;
+	two_factor: boolean;
+	created_at: string;
+	last_seen_at?: string;
+}
+
+export interface Member extends User {
+	sessions: number;
+	passkeys: number;
+}
+
+export interface Invite {
+	id: number;
+	role: Role;
+	created_by: string;
+	created_at: string;
+	expires_at: string;
+	token?: string;
+}
+
+export interface Passkey {
+	id: string;
+	name: string;
+	created_at: string;
+	last_used_at?: string;
+}
+
+export interface AuditEntry {
+	id: number;
+	at: string;
+	user_id?: number;
+	username: string;
+	action: string;
+	target: string;
+	ip: string;
+}
+
+export interface LoginResult {
+	user?: User;
+	ticket?: string;
+}
+
 export interface AuthState {
 	setup_required: boolean;
-	user: { username: string } | null;
+	user: User | null;
 	version: string;
 }
 
