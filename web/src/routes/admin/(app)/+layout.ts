@@ -5,7 +5,7 @@ import type { LayoutLoad } from './$types';
 
 export const load: LayoutLoad = async ({ parent, fetch, depends }) => {
 	const { auth } = await parent();
-	if (auth.setup_required) redirect(307, '/admin/setup');
+	if (auth.setup_required) redirect(307, '/admin/install');
 	if (!auth.user) redirect(307, '/admin/login');
 
 	depends('heron:counts');

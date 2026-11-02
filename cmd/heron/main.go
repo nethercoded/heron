@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"syscall"
@@ -29,6 +30,7 @@ import (
 	"github.com/nethercode/heron/internal/monitor"
 	"github.com/nethercode/heron/internal/notify"
 	"github.com/nethercode/heron/internal/scheduler"
+	"github.com/nethercode/heron/internal/site"
 	"github.com/nethercode/heron/internal/store"
 	"github.com/nethercode/heron/web"
 )
@@ -157,17 +159,26 @@ func serve(args []string) error {
 		setupCode = rand.Text()[:12]
 	}
 
+	domains := site.New(db, filepath.Join(cfg.DataDir, "certs"), cfg.PublicURL, log.With("component", "site"))
+	domains.OnChange = eng.SetPublicURL
+
 	api := httpapi.New(db, eng, sched, dispatcher, auth.NewSessions(db, cfg.SecureCookies()), log.With("component", "http"), httpapi.Options{
 		Version:        ver,
 		SetupCode:      setupCode,
+		Site:           domains,
 		Location:       cfg.Location,
 		TrustedProxies: cfg.Proxies,
 		Assets:         web.Assets(),
 	})
+	handler := api.Handler()
+	domains.Handler = handler
+	if err := domains.Start(ctx); err != nil {
+		log.Error("could not start https for the saved domain, serving plain http only", "err", err)
+	}
 
 	srv := &http.Server{
 		Addr:              cfg.Listen,
-		Handler:           api.Handler(),
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -205,6 +216,7 @@ func serve(args []string) error {
 	defer cancel()
 
 	cancelRun()
+	domains.Close(shutdownCtx)
 	errs := []error{srv.Shutdown(shutdownCtx)}
 	sched.Wait()
 	errs = append(errs, dispatcher.Close(shutdownCtx))

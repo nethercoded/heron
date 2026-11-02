@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/nethercode/heron/internal/broker"
@@ -46,22 +47,23 @@ type Engine struct {
 	events    *broker.Broker[Event]
 	calendar  *maintenance.Calendar
 	log       *slog.Logger
-	publicURL string
+	publicURL atomic.Pointer[string]
 
 	mu   sync.Mutex
 	last map[int64]monitor.Status
 }
 
 func New(s *store.Store, n Notifier, calendar *maintenance.Calendar, log *slog.Logger, publicURL string) *Engine {
-	return &Engine{
-		store:     s,
-		notifier:  n,
-		events:    broker.New[Event](32),
-		calendar:  calendar,
-		log:       log,
-		publicURL: publicURL,
-		last:      map[int64]monitor.Status{},
+	e := &Engine{
+		store:    s,
+		notifier: n,
+		events:   broker.New[Event](32),
+		calendar: calendar,
+		log:      log,
+		last:     map[int64]monitor.Status{},
 	}
+	e.SetPublicURL(publicURL)
+	return e
 }
 
 func (e *Engine) Events() *broker.Broker[Event] {
@@ -245,14 +247,22 @@ func (e *Engine) notify(ctx context.Context, m *monitor.Monitor, msg notify.Mess
 	e.notifier.Dispatch(list, msg)
 }
 
+func (e *Engine) SetPublicURL(url string) {
+	e.publicURL.Store(&url)
+}
+
 func (e *Engine) Link(m *monitor.Monitor) string {
-	if e.publicURL == "" {
+	base := ""
+	if p := e.publicURL.Load(); p != nil {
+		base = *p
+	}
+	if base == "" {
 		return ""
 	}
 	if m == nil || !m.Public {
-		return e.publicURL
+		return base
 	}
-	return e.publicURL + "/monitor/" + m.Slug
+	return base + "/monitor/" + m.Slug
 }
 
 func (e *Engine) Changed(m *monitor.Monitor) {

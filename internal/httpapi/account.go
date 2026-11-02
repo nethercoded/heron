@@ -61,7 +61,7 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	if err := s.sessions.Start(r.Context(), w, user); err != nil {
+	if err := s.sessions.Start(r.Context(), w, r, user); err != nil {
 		return err
 	}
 	s.log.Info("administrator created", "username", user.Username)
@@ -79,7 +79,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) error {
 	if err := decode(w, r, &in); err != nil {
 		return err
 	}
-	user, err := s.sessions.Login(r.Context(), w, strings.TrimSpace(in.Username), in.Password)
+	user, err := s.sessions.Login(r.Context(), w, r, strings.TrimSpace(in.Username), in.Password)
 	if errors.Is(err, auth.ErrInvalidCredentials) {
 		s.log.Warn("failed login", "username", in.Username, "ip", ip)
 		return errorf(http.StatusUnauthorized, "invalid_credentials", "invalid username or password")

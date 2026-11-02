@@ -30,7 +30,7 @@ func NewSessions(s *store.Store, secure bool) *Sessions {
 	return &Sessions{store: s, secure: secure, dummy: dummy}
 }
 
-func (s *Sessions) Login(ctx context.Context, w http.ResponseWriter, username, password string) (*store.User, error) {
+func (s *Sessions) Login(ctx context.Context, w http.ResponseWriter, r *http.Request, username, password string) (*store.User, error) {
 	user, err := s.store.UserByName(ctx, username)
 	if errors.Is(err, store.ErrNotFound) {
 		_, _ = Verify(s.dummy, password)
@@ -47,16 +47,16 @@ func (s *Sessions) Login(ctx context.Context, w http.ResponseWriter, username, p
 	if !ok {
 		return nil, ErrInvalidCredentials
 	}
-	return user, s.Start(ctx, w, user)
+	return user, s.Start(ctx, w, r, user)
 }
 
-func (s *Sessions) Start(ctx context.Context, w http.ResponseWriter, user *store.User) error {
+func (s *Sessions) Start(ctx context.Context, w http.ResponseWriter, r *http.Request, user *store.User) error {
 	token := rand.Text()
 	expires := time.Now().Add(sessionTTL)
 	if err := s.store.CreateSession(ctx, digest(token), user.ID, expires); err != nil {
 		return err
 	}
-	http.SetCookie(w, s.cookie(token, expires))
+	http.SetCookie(w, s.cookie(r, token, expires))
 	return nil
 }
 
@@ -73,14 +73,14 @@ func (s *Sessions) User(ctx context.Context, w http.ResponseWriter, r *http.Requ
 	if time.Until(expires) < sessionTTL-refreshWindow {
 		next := time.Now().Add(sessionTTL)
 		if err := s.store.ExtendSession(ctx, hash, next); err == nil {
-			http.SetCookie(w, s.cookie(c.Value, next))
+			http.SetCookie(w, s.cookie(r, c.Value, next))
 		}
 	}
 	return user, nil
 }
 
 func (s *Sessions) Logout(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-	http.SetCookie(w, s.cookie("", time.Unix(1, 0)))
+	http.SetCookie(w, s.cookie(r, "", time.Unix(1, 0)))
 	if c, err := r.Cookie(CookieName); err == nil {
 		return s.store.DeleteSession(ctx, digest(c.Value))
 	}
@@ -95,14 +95,14 @@ func (s *Sessions) Revoke(ctx context.Context, r *http.Request, userID int64) er
 	return s.store.DeleteUserSessions(ctx, userID, keep)
 }
 
-func (s *Sessions) cookie(value string, expires time.Time) *http.Cookie {
+func (s *Sessions) cookie(r *http.Request, value string, expires time.Time) *http.Cookie {
 	return &http.Cookie{
 		Name:     CookieName,
 		Value:    value,
 		Path:     "/",
 		Expires:  expires,
 		HttpOnly: true,
-		Secure:   s.secure,
+		Secure:   s.secure || r.TLS != nil,
 		SameSite: http.SameSiteStrictMode,
 	}
 }

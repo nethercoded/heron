@@ -12,6 +12,7 @@ import (
 	"github.com/nethercode/heron/internal/engine"
 	"github.com/nethercode/heron/internal/monitor"
 	"github.com/nethercode/heron/internal/notify"
+	"github.com/nethercode/heron/internal/site"
 	"github.com/nethercode/heron/internal/store"
 )
 
@@ -29,6 +30,7 @@ type Sender interface {
 type Options struct {
 	Version        string
 	SetupCode      string
+	Site           Site
 	Location       *time.Location
 	TrustedProxies []netip.Prefix
 	Assets         fs.FS
@@ -83,6 +85,8 @@ func (s *Server) Handler() http.Handler {
 
 	mux.Handle("GET /api/auth/state", s.handle(s.authState))
 	mux.Handle("POST /api/auth/setup", s.handle(s.setup))
+	mux.Handle("POST /api/install/domain", s.handle(s.installDomain))
+	mux.HandleFunc("GET "+site.ProbePath+"{nonce}", s.probe)
 	mux.Handle("POST /api/auth/login", s.handle(s.login))
 	mux.Handle("POST /api/auth/logout", s.handle(s.logout))
 
@@ -120,6 +124,9 @@ func (s *Server) Handler() http.Handler {
 	admin.Handle("GET /api/admin/maintenance/{id}", s.handle(s.getMaintenance))
 	admin.Handle("PUT /api/admin/maintenance/{id}", s.handle(s.updateMaintenance))
 	admin.Handle("DELETE /api/admin/maintenance/{id}", s.handle(s.deleteMaintenance))
+
+	admin.Handle("GET /api/admin/site", s.handle(s.getSite))
+	admin.Handle("PUT /api/admin/site", s.handle(s.saveSite))
 
 	admin.Handle("GET /api/admin/page", s.handle(s.getPage))
 	admin.Handle("PUT /api/admin/page", s.handle(s.savePage))

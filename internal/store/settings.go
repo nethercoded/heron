@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json/v2"
 	"errors"
+
+	"github.com/nethercode/heron/internal/site"
 )
 
 type Page struct {
@@ -33,6 +35,28 @@ func (s *Store) Page(ctx context.Context) (Page, error) {
 		return page, err
 	}
 	return page, nil
+}
+
+func (s *Store) Site(ctx context.Context) (site.Settings, error) {
+	var out site.Settings
+	var raw []byte
+	err := s.db.QueryRowContext(ctx, `select value from settings where key = 'site'`).Scan(&raw)
+	if errors.Is(translate(err), ErrNotFound) {
+		return out, nil
+	}
+	if err != nil {
+		return out, err
+	}
+	return out, json.Unmarshal(raw, &out)
+}
+
+func (s *Store) SaveSite(ctx context.Context, settings site.Settings) error {
+	raw, err := json.Marshal(settings)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `insert into settings (key, value) values ('site', ?) on conflict (key) do update set value = excluded.value`, raw)
+	return err
 }
 
 func (s *Store) SavePage(ctx context.Context, page Page) error {

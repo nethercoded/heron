@@ -6,7 +6,7 @@
 	import Snippet from '#lib/components/Snippet.svelte';
 	import { badgeMarkdown, widgetSnippet } from '#lib/embed.ts';
 	import { toast } from '#lib/toast.svelte.ts';
-	import type { Page } from '#lib/types.ts';
+	import type { Page, SiteSettings } from '#lib/types.ts';
 	import { goto } from '$app/navigation';
 	import { page as route } from '$app/state';
 	import type { PageProps } from './$types';
@@ -19,6 +19,31 @@
 	let page = $state<Page>(untrack(() => ({ ...data.page })));
 	let pageFields = $state<Record<string, string>>({});
 	let saving = $state(false);
+
+	let site = $state(untrack(() => ({ ...data.site, mode: data.site.mode || 'direct' })));
+	let siteFields = $state<Record<string, string>>({});
+	let siteBusy = $state(false);
+
+	async function saveSite(event: SubmitEvent) {
+		event.preventDefault();
+		siteBusy = true;
+		siteFields = {};
+		try {
+			const res = await api.put<SiteSettings>('/admin/site', {
+				domain: site.domain,
+				mode: site.domain ? site.mode : '',
+				email: site.email
+			});
+			site = { ...res, mode: res.mode || 'direct' };
+			if (res.url && !res.reachable) toast.info(`Saved. ${res.url} does not reach heron yet, check your proxy.`);
+			else toast.success(res.url ? `heron now answers at ${res.url}` : 'Domain removed');
+		} catch (err) {
+			if (err instanceof ApiError) siteFields = err.fields;
+			toast.error(message(err));
+		} finally {
+			siteBusy = false;
+		}
+	}
 
 	let current = $state('');
 	let next = $state('');
@@ -62,6 +87,32 @@
 <PageHeader title="Settings" />
 
 <div class="space-y-6">
+	<form class="card p-5 sm:p-6" onsubmit={saveSite} novalidate>
+		<h2 class="font-semibold">Domain</h2>
+		<p class="mb-5 text-sm text-muted">
+			{#if data.site.url}
+				heron answers at <a class="text-ink underline" href={data.site.url}>{data.site.url}</a>
+				{data.site.mode === 'direct' ? 'with its own Let’s Encrypt certificate.' : 'behind your reverse proxy.'}
+			{:else}
+				No domain yet. heron is reachable on the server address only.
+			{/if}
+		</p>
+		<div class="grid gap-4 sm:grid-cols-[1fr_auto]">
+			<Field label="Domain" id="site-domain" hint="Leave empty to stop serving a domain" error={siteFields.domain}>
+				<input id="site-domain" class="input font-mono" placeholder="status.example.com" bind:value={site.domain} aria-invalid={!!siteFields.domain} />
+			</Field>
+			<Field label="HTTPS" id="site-mode">
+				<select id="site-mode" class="input-select" bind:value={site.mode}>
+					<option value="direct">heron handles it</option>
+					<option value="proxy">Reverse proxy</option>
+				</select>
+			</Field>
+		</div>
+		<div class="mt-6 flex justify-end">
+			<button class="btn-primary" disabled={siteBusy}>{siteBusy ? 'Checking…' : 'Save domain'}</button>
+		</div>
+	</form>
+
 	<form class="card p-5 sm:p-6" onsubmit={savePage} novalidate>
 		<h2 class="font-semibold">Status page</h2>
 		<p class="mb-5 text-sm text-muted">How the public page looks to your users.</p>

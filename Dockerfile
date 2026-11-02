@@ -26,7 +26,7 @@ ENV HERON_LISTEN=:8080 \
     HERON_DATA_DIR=/data \
     HERON_LOG_FORMAT=json
 VOLUME /data
-EXPOSE 8080
+EXPOSE 8080 80 443
 USER nonroot:nonroot
 ENTRYPOINT ["/usr/local/bin/heron"]
 CMD ["serve"]

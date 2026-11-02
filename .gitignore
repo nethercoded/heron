@@ -1,5 +1,6 @@
 /heron
 *.exe
+*.exe~
 /dist/
 /data/
 /heron.toml

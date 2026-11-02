@@ -222,6 +222,14 @@ export interface Channel {
 	updated_at: string;
 }
 
+export interface SiteSettings {
+	domain: string;
+	mode: '' | 'direct' | 'proxy';
+	email: string;
+	url: string;
+	reachable: boolean;
+}
+
 export interface AuthState {
 	setup_required: boolean;
 	user: { username: string } | null;
