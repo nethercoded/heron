@@ -127,28 +127,34 @@ func (s *Store) attach(ctx context.Context, list []*Incident) error {
 		byID[inc.ID] = inc
 		ids = append(ids, inc.ID)
 	}
-	in := placeholders(len(ids))
+	if err := s.attachMonitors(ctx, byID, ids); err != nil {
+		return err
+	}
+	return s.attachUpdates(ctx, byID, ids)
+}
 
-	rows, err := s.db.QueryContext(ctx, `select incident_id, monitor_id from incident_monitors where incident_id in (`+in+`) order by monitor_id`, args(ids)...)
+func (s *Store) attachMonitors(ctx context.Context, byID map[int64]*Incident, ids []int64) error {
+	rows, err := s.db.QueryContext(ctx, `
+		select incident_id, monitor_id from incident_monitors
+		where incident_id in (`+placeholders(len(ids))+`) order by monitor_id`, args(ids)...)
 	if err != nil {
 		return err
 	}
+	defer rows.Close()
 	for rows.Next() {
 		var incidentID, monitorID int64
 		if err := rows.Scan(&incidentID, &monitorID); err != nil {
-			rows.Close()
 			return err
 		}
 		byID[incidentID].MonitorIDs = append(byID[incidentID].MonitorIDs, monitorID)
 	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return err
-	}
+	return rows.Err()
+}
 
-	rows, err = s.db.QueryContext(ctx, `
+func (s *Store) attachUpdates(ctx context.Context, byID map[int64]*Incident, ids []int64) error {
+	rows, err := s.db.QueryContext(ctx, `
 		select incident_id, id, status, body, created_at from incident_updates
-		where incident_id in (`+in+`) order by created_at desc, id desc`, args(ids)...)
+		where incident_id in (`+placeholders(len(ids))+`) order by created_at desc, id desc`, args(ids)...)
 	if err != nil {
 		return err
 	}

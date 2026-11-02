@@ -5,14 +5,12 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/binary"
-	"fmt"
+	"errors"
 	"io"
-	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
-
-	"golang.org/x/net/http2"
 )
 
 type GRPCChecker struct{}
@@ -25,17 +23,18 @@ var servingStatus = map[uint64]string{
 }
 
 func (GRPCChecker) Check(ctx context.Context, m *Monitor) Result {
-	transport := &http2.Transport{}
+	var protocols http.Protocols
 	scheme := "https"
 	if m.Settings.TLS {
-		transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: m.Settings.IgnoreTLS}
+		protocols.SetHTTP2(true)
 	} else {
 		scheme = "http"
-		transport.AllowHTTP = true
-		transport.DialTLSContext = func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
-			var d net.Dialer
-			return d.DialContext(ctx, network, addr)
-		}
+		protocols.SetUnencryptedHTTP2(true)
+	}
+	transport := &http.Transport{
+		Protocols:         &protocols,
+		TLSClientConfig:   &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: m.Settings.IgnoreTLS},
+		DisableKeepAlives: true,
 	}
 	defer transport.CloseIdleConnections()
 
@@ -84,35 +83,34 @@ func healthRequest(service string) []byte {
 	return append(frame, msg...)
 }
 
+var errMalformedHealth = errors.New("malformed health response")
+
 func healthStatus(body []byte) (uint64, error) {
 	if len(body) < 5 {
-		return 0, fmt.Errorf("empty health response")
+		return 0, errors.New("empty health response")
 	}
 	if body[0] != 0 {
-		return 0, fmt.Errorf("compressed responses are not supported")
+		return 0, errors.New("compressed responses are not supported")
 	}
 	size := binary.BigEndian.Uint32(body[1:5])
 	msg := body[5:]
 	if uint32(len(msg)) < size {
-		return 0, fmt.Errorf("truncated health response")
+		return 0, errors.New("truncated health response")
 	}
 	msg = msg[:size]
-	for len(msg) > 0 {
-		key, n := binary.Uvarint(msg)
-		if n <= 0 {
-			return 0, fmt.Errorf("malformed health response")
-		}
-		msg = msg[n:]
-		if key == 0x08 {
-			value, n := binary.Uvarint(msg)
-			if n <= 0 {
-				return 0, fmt.Errorf("malformed health response")
-			}
-			return value, nil
-		}
-		return 0, fmt.Errorf("unexpected field in health response")
+	if len(msg) == 0 {
+		return 0, nil
 	}
-	return 0, nil
+
+	key, n := binary.Uvarint(msg)
+	if n <= 0 || key != 0x08 {
+		return 0, errMalformedHealth
+	}
+	value, n := binary.Uvarint(msg[n:])
+	if n <= 0 {
+		return 0, errMalformedHealth
+	}
+	return value, nil
 }
 
 func grpcStatus(resp *http.Response) string {
@@ -123,7 +121,7 @@ func grpcStatus(resp *http.Response) string {
 		return v
 	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Sprintf("http %d", resp.StatusCode)
+		return "http " + strconv.Itoa(resp.StatusCode)
 	}
 	return "0"
 }

@@ -74,7 +74,9 @@ func (MinecraftChecker) Check(ctx context.Context, m *Monitor) Result {
 		return Down(latency, "malformed status")
 	}
 	raw := make([]byte, size)
-	io.ReadFull(body, raw)
+	if _, err := io.ReadFull(body, raw); err != nil {
+		return Down(latency, "malformed status")
+	}
 
 	var status minecraftStatus
 	if err := json.Unmarshal(raw, &status, json.RejectUnknownMembers(false)); err != nil {
@@ -136,6 +138,8 @@ func exchange(conn net.Conn, msg []byte) ([]byte, error) {
 	return buf[:n], nil
 }
 
+var errTruncatedA2S = errors.New("truncated A2S response")
+
 type a2s struct {
 	name, mapName, game string
 	players, max        int
@@ -144,20 +148,20 @@ type a2s struct {
 func parseA2S(b []byte) (a2s, error) {
 	var info a2s
 	if len(b) < 6 || !bytes.Equal(b[:4], []byte{0xff, 0xff, 0xff, 0xff}) || b[4] != 'I' {
-		return info, fmt.Errorf("unexpected A2S response")
+		return info, errors.New("unexpected A2S response")
 	}
 	rest := b[6:]
 	fields := make([]string, 4)
 	for i := range fields {
 		end := bytes.IndexByte(rest, 0)
 		if end < 0 {
-			return info, fmt.Errorf("truncated A2S response")
+			return info, errTruncatedA2S
 		}
 		fields[i] = string(rest[:end])
 		rest = rest[end+1:]
 	}
 	if len(rest) < 4 {
-		return info, fmt.Errorf("truncated A2S response")
+		return info, errTruncatedA2S
 	}
 	info.name, info.mapName, info.game = fields[0], fields[1], fields[3]
 	info.players, info.max = int(rest[2]), int(rest[3])

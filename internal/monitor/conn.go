@@ -15,7 +15,10 @@ func dial(ctx context.Context, network, address string, secure bool) (net.Conn, 
 		return nil, err
 	}
 	if deadline, ok := ctx.Deadline(); ok {
-		conn.SetDeadline(deadline)
+		if err := conn.SetDeadline(deadline); err != nil {
+			conn.Close()
+			return nil, err
+		}
 	}
 	if !secure {
 		return conn, nil

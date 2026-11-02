@@ -170,14 +170,14 @@ func (e *Engine) wentDown(ctx context.Context, m *monitor.Monitor, res monitor.R
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		inc := &store.Incident{
-			Title:      fmt.Sprintf("%s is unavailable", m.Name),
+			Title:      m.Name + " is unavailable",
 			Impact:     store.ImpactMajor,
 			Status:     store.IncidentInvestigating,
 			Automatic:  true,
 			MonitorIDs: []int64{m.ID},
 			StartedAt:  res.At.UTC().Truncate(time.Second),
 		}
-		body := fmt.Sprintf("%s is not responding. We are looking into it.", m.Name)
+		body := m.Name + " is not responding. We are looking into it."
 		if err := e.store.CreateIncident(ctx, inc, body); err != nil {
 			e.log.Error("open incident", "monitor", m.Slug, "err", err)
 		} else {

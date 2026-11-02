@@ -22,7 +22,12 @@ linters:
     errcheck:
       exclude-functions:
         - (io.Closer).Close
+        - (io/fs.File).Close
+        - (*database/sql.DB).Close
         - (*database/sql.Rows).Close
+        - (*github.com/jackc/pgx/v5.Conn).Close
+        - (*github.com/nethercode/heron/internal/store.Store).Close
+        - (*github.com/nethercode/heron/internal/monitor.session).Close
         - (net.Conn).Close
         - (*os.File).Close
         - fmt.Fprint

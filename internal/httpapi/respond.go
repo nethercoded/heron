@@ -87,7 +87,9 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 		}
 		apiErr = errorf(http.StatusInternalServerError, "internal", "internal server error")
 	}
-	writeJSON(w, apiErr.Status, apiErr)
+	if err := writeJSON(w, apiErr.Status, apiErr); err != nil {
+		s.log.Debug("write error response", "err", err)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) error {

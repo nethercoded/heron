@@ -3,7 +3,7 @@ package httpapi
 import (
 	"cmp"
 	"fmt"
-	"html"
+	"html/template"
 	"math"
 	"net/http"
 	"slices"
@@ -137,33 +137,39 @@ func formatRatio(ratio float64) string {
 	return fmt.Sprintf("%.2f%%", math.Floor(pct*100)/100)
 }
 
+var badgeTemplate = template.Must(template.New("badge").Parse(
+	`<svg xmlns="http://www.w3.org/2000/svg" width="{{.Width}}" height="20" role="img" aria-label="{{.Label}}: {{.Value}}">` +
+		`<title>{{.Label}}: {{.Value}}</title>` +
+		`<linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>` +
+		`<clipPath id="r"><rect width="{{.Width}}" height="20" rx="3" fill="#fff"/></clipPath>` +
+		`<g clip-path="url(#r)"><rect width="{{.LabelWidth}}" height="20" fill="#555"/><rect x="{{.LabelWidth}}" width="{{.ValueWidth}}" height="20" fill="{{.Color}}"/><rect width="{{.Width}}" height="20" fill="url(#s)"/></g>` +
+		`<g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11">` +
+		`<text x="{{.LabelX}}" y="15" fill="#010101" fill-opacity=".3">{{.Label}}</text><text x="{{.LabelX}}" y="14">{{.Label}}</text>` +
+		`<text x="{{.ValueX}}" y="15" fill="#010101" fill-opacity=".3">{{.Value}}</text><text x="{{.ValueX}}" y="14">{{.Value}}</text>` +
+		`</g></svg>`))
+
+type badge struct {
+	Label, Value, Color           string
+	Width, LabelWidth, ValueWidth int
+	LabelX, ValueX                float64
+}
+
 func writeBadge(w http.ResponseWriter, r *http.Request, label, value, color string) error {
 	label = cmp.Or(strings.TrimSpace(r.URL.Query().Get("label")), label)
-	if len(label) > 40 {
-		label = label[:40]
+	if runes := []rune(label); len(runes) > 40 {
+		label = string(runes[:40])
 	}
 
-	lw := textWidth(label) + 10
-	vw := textWidth(value) + 10
-	total := lw + vw
-	esc := html.EscapeString
+	b := badge{Label: label, Value: value, Color: color, LabelWidth: textWidth(label) + 10, ValueWidth: textWidth(value) + 10}
+	b.Width = b.LabelWidth + b.ValueWidth
+	b.LabelX = float64(b.LabelWidth) / 2
+	b.ValueX = float64(b.LabelWidth) + float64(b.ValueWidth)/2
 
 	h := w.Header()
 	h.Set("Content-Type", "image/svg+xml; charset=utf-8")
 	h.Set("Cache-Control", "public, max-age=60, s-maxage=60")
 	h.Set("Access-Control-Allow-Origin", "*")
-
-	_, err := fmt.Fprintf(w, `<svg xmlns="http://www.w3.org/2000/svg" width="%[1]d" height="20" role="img" aria-label="%[4]s: %[5]s">`+
-		`<title>%[4]s: %[5]s</title>`+
-		`<linearGradient id="s" x2="0" y2="100%%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>`+
-		`<clipPath id="r"><rect width="%[1]d" height="20" rx="3" fill="#fff"/></clipPath>`+
-		`<g clip-path="url(#r)"><rect width="%[2]d" height="20" fill="#555"/><rect x="%[2]d" width="%[3]d" height="20" fill="%[6]s"/><rect width="%[1]d" height="20" fill="url(#s)"/></g>`+
-		`<g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11">`+
-		`<text x="%[7].1f" y="15" fill="#010101" fill-opacity=".3">%[4]s</text><text x="%[7].1f" y="14">%[4]s</text>`+
-		`<text x="%[8].1f" y="15" fill="#010101" fill-opacity=".3">%[5]s</text><text x="%[8].1f" y="14">%[5]s</text>`+
-		`</g></svg>`,
-		total, lw, vw, esc(label), esc(value), color, float64(lw)/2, float64(lw)+float64(vw)/2)
-	return err
+	return badgeTemplate.Execute(w, b)
 }
 
 func textWidth(s string) int {

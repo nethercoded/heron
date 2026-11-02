@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"errors"
 	"flag"
 	"fmt"
@@ -146,9 +147,19 @@ func serve(args []string) error {
 	go eng.Housekeep(runCtx, time.Duration(cfg.RetentionDays)*24*time.Hour)
 	go eng.WatchMaintenance(runCtx)
 
+	users, err := db.CountUsers(ctx)
+	if err != nil {
+		cancelRun()
+		return err
+	}
+	var setupCode string
+	if users == 0 {
+		setupCode = rand.Text()[:12]
+	}
+
 	api := httpapi.New(db, eng, sched, dispatcher, auth.NewSessions(db, cfg.SecureCookies()), log.With("component", "http"), httpapi.Options{
 		Version:        ver,
-		PublicURL:      cfg.PublicURL,
+		SetupCode:      setupCode,
 		Location:       cfg.Location,
 		TrustedProxies: cfg.Proxies,
 		Assets:         web.Assets(),
@@ -166,16 +177,16 @@ func serve(args []string) error {
 		BaseContext:       func(net.Listener) context.Context { return runCtx },
 	}
 
-	ln, err := net.Listen("tcp", cfg.Listen)
+	var lc net.ListenConfig
+	ln, err := lc.Listen(ctx, "tcp", cfg.Listen)
 	if err != nil {
 		cancelRun()
 		return err
 	}
 
-	users, _ := db.CountUsers(ctx)
 	log.Info("heron started", "version", ver, "listen", ln.Addr().String(), "monitors", len(monitors), "data", cfg.DataDir)
-	if users == 0 {
-		log.Warn("no administrator yet, open the admin panel to finish setup", "url", setupURL(cfg, ln.Addr()))
+	if setupCode != "" {
+		log.Warn("no administrator yet, open the admin panel and enter the setup code", "url", setupURL(cfg, ln.Addr()), "setup_code", setupCode)
 	}
 
 	serveErr := make(chan error, 1)

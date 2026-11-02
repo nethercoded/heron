@@ -2,8 +2,10 @@ package monitor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -61,16 +63,19 @@ func (s *session) reply() (string, error) {
 		return "", err
 	}
 	if line == "" {
-		return "", fmt.Errorf("empty reply")
+		return "", errors.New("empty reply")
 	}
 	switch line[0] {
 	case '+', ':':
 		return line[1:], nil
 	case '-':
-		return "", fmt.Errorf("%s", line[1:])
+		return "", errors.New(line[1:])
 	case '$':
-		var n int
-		if _, err := fmt.Sscanf(line[1:], "%d", &n); err != nil || n < 0 {
+		n, err := strconv.Atoi(line[1:])
+		if err != nil {
+			return "", fmt.Errorf("bad bulk length %q", line)
+		}
+		if n < 0 {
 			return "", nil
 		}
 		buf := make([]byte, n+2)
@@ -79,8 +84,10 @@ func (s *session) reply() (string, error) {
 		}
 		return string(buf[:n]), nil
 	case '*':
-		var n int
-		fmt.Sscanf(line[1:], "%d", &n)
+		n, err := strconv.Atoi(line[1:])
+		if err != nil {
+			return "", fmt.Errorf("bad array length %q", line)
+		}
 		var first string
 		for i := range n {
 			v, err := s.reply()

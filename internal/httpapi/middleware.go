@@ -69,7 +69,7 @@ func (s *Server) observe(next http.Handler) http.Handler {
 
 		defer func() {
 			if v := recover(); v != nil {
-				if v == http.ErrAbortHandler {
+				if err, ok := v.(error); ok && errors.Is(err, http.ErrAbortHandler) {
 					panic(v)
 				}
 				s.log.Error("panic", "value", v, "path", r.URL.Path, "stack", string(debug.Stack()))

@@ -12,9 +12,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 )
 
 func serveTCP(t *testing.T, handle func(conn net.Conn)) string {
@@ -176,7 +173,10 @@ func TestGRPCChecker(t *testing.T) {
 		w.Write(frame)
 		w.Header().Set("Grpc-Status", "0")
 	})
-	srv := httptest.NewServer(h2c.NewHandler(handler, &http2.Server{}))
+	srv := httptest.NewUnstartedServer(handler)
+	srv.Config.Protocols = new(http.Protocols)
+	srv.Config.Protocols.SetUnencryptedHTTP2(true)
+	srv.Start()
 	t.Cleanup(srv.Close)
 	addr := strings.TrimPrefix(srv.URL, "http://")
 

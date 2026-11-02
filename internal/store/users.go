@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"time"
 )
 
@@ -35,7 +36,7 @@ func (s *Store) CreateFirstUser(ctx context.Context, username, hash string) (*Us
 		select ?, ?, ? where not exists (select 1 from users) returning id`,
 		username, hash, u.CreatedAt.Unix()).Scan(&u.ID)
 	if err != nil {
-		if translate(err) == ErrNotFound {
+		if errors.Is(translate(err), ErrNotFound) {
 			return nil, ErrConflict
 		}
 		return nil, translate(err)

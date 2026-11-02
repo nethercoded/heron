@@ -49,7 +49,7 @@ func (SMTPChecker) Check(ctx context.Context, m *Monitor) Result {
 	}
 
 	latency := time.Since(started)
-	s.send("QUIT")
+	_ = s.send("QUIT")
 	return Up(latency, "%s", strings.TrimSpace(strings.TrimPrefix(firstLine(banner, nil), "220")))
 }
 
@@ -100,7 +100,7 @@ func (IMAPChecker) Check(ctx context.Context, m *Monitor) Result {
 		return Down(latency, "unexpected greeting %q", greeting)
 	}
 
-	s.send("h1 LOGOUT")
+	_ = s.send("h1 LOGOUT")
 	return Up(latency, "%s", strings.TrimSpace(strings.TrimPrefix(greeting, "* OK")))
 }
 

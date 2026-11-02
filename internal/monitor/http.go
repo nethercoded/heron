@@ -136,7 +136,7 @@ func describeNetError(err error) string {
 	case errors.Is(err, context.DeadlineExceeded):
 		return "request timed out"
 	case errors.As(err, &dnsErr):
-		return fmt.Sprintf("dns lookup failed for %s", dnsErr.Name)
+		return "dns lookup failed for " + dnsErr.Name
 	case errors.As(err, &certErr):
 		return fmt.Sprintf("tls verification failed: %v", certErr.Err)
 	case errors.As(err, &opErr) && opErr.Op == "dial":
