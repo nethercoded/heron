@@ -24,6 +24,7 @@ var (
 	blockStyles  = map[string][]string{BlockHero: {"", "full", "compact"}, BlockMonitors: {"", "bars", "list"}}
 	noticeTones  = []string{"", "info", "success", "warning", "danger"}
 	historySpans = []int{0, 7, 14, 30}
+	blockWidths  = []int{0, 4, 6, 8}
 )
 
 type Block struct {
@@ -37,6 +38,7 @@ type Block struct {
 	Style  string `json:"style,omitzero"`
 	Days   int    `json:"days,omitzero"`
 	Stats  string `json:"stats,omitzero"`
+	Width  int    `json:"width,omitzero"`
 }
 
 func DefaultBlocks() []Block {
@@ -73,6 +75,9 @@ func NormalizeBlocks(blocks []Block) []Block {
 		}
 		if _, ok := blockStyles[b.Type]; !ok {
 			b.Style = ""
+		}
+		if b.Width == 12 || b.Type == BlockHero {
+			b.Width = 0
 		}
 		out[i] = b
 	}
@@ -122,6 +127,9 @@ func ValidateBlocks(blocks []Block) map[string]string {
 		}
 		if !slices.Contains(historySpans, b.Days) {
 			fields[at("days")] = "must be 7, 14 or 30"
+		}
+		if !slices.Contains(blockWidths, b.Width) {
+			fields[at("width")] = "must be a third, half, two thirds or the full width"
 		}
 		if b.Stats != "" && b.Stats != "hide" {
 			fields[at("stats")] = "must be empty or hide"

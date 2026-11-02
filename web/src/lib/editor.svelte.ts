@@ -74,7 +74,7 @@ export class Editor {
 			(page) => {
 				const target = page.blocks.find((b) => b.id === id);
 				if (!target) return;
-				if (value === '' || value === undefined || value === false) delete target[field];
+				if (value === '' || value === undefined || value === false || value === 0) delete target[field];
 				else target[field] = value;
 			},
 			`${id}:${String(field)}`
@@ -170,7 +170,11 @@ export class Editor {
 		this.change((page) => {
 			const index = page.blocks.findIndex((b) => b.id === id);
 			if (index < 0) return;
-			page.blocks[index] = { ...fresh, id, hidden: page.blocks[index]?.hidden };
+			const old = page.blocks[index];
+			const next: Block = { ...fresh, id };
+			if (old?.hidden) next.hidden = true;
+			if (old?.width && type !== 'hero') next.width = old.width;
+			page.blocks[index] = next;
 		});
 		this.fields = {};
 	}

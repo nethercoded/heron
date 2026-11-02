@@ -354,3 +354,25 @@
 .studio button {
 	cursor: inherit;
 }
+
+.studio [contenteditable] {
+	cursor: text;
+	outline: none;
+	border-radius: 4px;
+	box-shadow: 0 0 0 4px transparent;
+	transition: box-shadow 0.15s;
+}
+
+.studio [contenteditable]:hover {
+	box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-accent) 12%, transparent);
+}
+
+.studio [contenteditable]:focus {
+	box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-accent) 22%, transparent);
+}
+
+.studio [contenteditable]:empty::before {
+	content: attr(data-placeholder);
+	color: var(--color-faint);
+	pointer-events: none;
+}

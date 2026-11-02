@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
 	import { ApiError, api, message } from '#lib/api.ts';
-	import { blockKinds, kindOf } from '#lib/blocks.ts';
+	import { blockKinds, kindOf, widthLabel } from '#lib/blocks.ts';
 	import BlockSettings from '#lib/components/BlockSettings.svelte';
 	import Field from '#lib/components/Field.svelte';
 	import Icon from '#lib/components/Icon.svelte';
@@ -68,7 +68,8 @@
 			selected: editor.selected,
 			errors: editor.invalid,
 			locale,
-			readonly
+			readonly,
+			inserting: editor.inserting
 		};
 		if (ready) frame?.contentWindow?.postMessage(message, location.origin);
 	});
@@ -105,6 +106,21 @@
 				case 'heron:key':
 					shortcut(msg.key, msg.shift);
 					break;
+				case 'heron:text': {
+					if (readonly) break;
+					if (msg.field === 'description') {
+						editor.setPage('description', msg.value);
+						break;
+					}
+					const block = editor.draft.blocks.find((b) => b.id === msg.id);
+					if (block) editor.set(block, msg.field, msg.value);
+					break;
+				}
+				case 'heron:resize': {
+					const block = editor.draft.blocks.find((b) => b.id === msg.id);
+					if (block && !readonly) editor.set(block, 'width', msg.width);
+					break;
+				}
 			}
 		};
 		const keys = (event: KeyboardEvent) => {
@@ -195,6 +211,11 @@
 	}
 
 	function summary(block: Block) {
+		const text = describe(block);
+		return block.width ? `${widthLabel(block.width)} · ${text}` : text;
+	}
+
+	function describe(block: Block) {
 		switch (block.type) {
 			case 'hero':
 				return block.style === 'compact' ? 'Compact' : 'With the heron';

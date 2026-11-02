@@ -52,3 +52,20 @@ export function blank(type: BlockType, blocks: Block[]): Block {
 	if (type === 'history') return { ...block, days: 7 };
 	return block;
 }
+
+export const widths: { value: number; label: string }[] = [
+	{ value: 4, label: '1/3' },
+	{ value: 6, label: '1/2' },
+	{ value: 8, label: '2/3' },
+	{ value: 0, label: 'Full' }
+];
+
+export const widthLabel = (width = 0) => widths.find((w) => w.value === width)?.label ?? 'Full';
+
+const spans: Record<number, string> = {
+	4: 'col-span-12 md:col-span-4',
+	6: 'col-span-12 md:col-span-6',
+	8: 'col-span-12 md:col-span-8'
+};
+
+export const spanClass = (block: Block) => `min-w-0 ${spans[block.width ?? 0] ?? 'col-span-12'}`;

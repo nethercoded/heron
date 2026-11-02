@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { blockKinds, toneColor } from '#lib/blocks.ts';
+	import { blockKinds, toneColor, widths } from '#lib/blocks.ts';
 	import type { Editor } from '#lib/editor.svelte.ts';
 	import type { Block, BlockType, Tone } from '#lib/types.ts';
 	import Field from './Field.svelte';
@@ -69,6 +69,32 @@
 			{/each}
 		</select>
 	</Field>
+
+	{#if block.type !== 'hero'}
+		<div>
+			<span class="label">Width</span>
+			<div class="grid grid-cols-4 gap-1 rounded-ctl bg-canvas p-1" role="radiogroup" aria-label="Width">
+				{#each widths as option (option.value)}
+					{@const on = (block.width ?? 0) === option.value}
+					<button
+						type="button"
+						role="radio"
+						aria-checked={on}
+						disabled={readonly}
+						class="flex flex-col items-center gap-1.5 rounded-lg px-2 pt-2 pb-1.5 text-[12px] font-medium transition-colors {on ? 'bg-ink text-canvas' : 'text-muted hover:text-ink'}"
+						onclick={() => editor.set(block, 'width', option.value)}
+					>
+						<span class="flex h-1.5 w-full gap-0.5" aria-hidden="true">
+							<span class="rounded-full {on ? 'bg-canvas' : 'bg-ink-2'}" style="width: {((option.value || 12) / 12) * 100}%"></span>
+							<span class="flex-1 rounded-full {on ? 'bg-canvas/25' : 'bg-line-strong'}"></span>
+						</span>
+						{option.label}
+					</button>
+				{/each}
+			</div>
+			<p class="hint">Narrow blocks sit side by side. You can also drag the handle on the block’s edge. Phones always show one per row.</p>
+		</div>
+	{/if}
 
 	{#if block.type === 'hero'}
 		<div>

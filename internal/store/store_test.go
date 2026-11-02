@@ -325,8 +325,12 @@ func TestBlocks(t *testing.T) {
 	}
 	page.Blocks = NormalizeBlocks([]Block{
 		{ID: "top", Type: BlockNotice, Title: "Moving", Body: "We move on Friday", Tone: "info", Group: "dropped"},
-		{ID: "api", Type: BlockMonitors, Group: "API", Style: "list", Days: 7},
+		{ID: "api", Type: BlockMonitors, Group: "API", Style: "list", Days: 7, Width: 6},
+		{ID: "hero", Type: BlockHero, Width: 6},
 	})
+	if page.Blocks[2].Width != 0 || page.Blocks[1].Width != 6 {
+		t.Errorf("widths = %+v", page.Blocks)
+	}
 	if page.Blocks[0].Group != "" || page.Blocks[1].Days != 0 {
 		t.Errorf("normalize kept foreign settings: %+v", page.Blocks)
 	}
@@ -337,13 +341,13 @@ func TestBlocks(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _ := s.Page(t.Context())
-	if len(got.Blocks) != 2 || got.Blocks[1].Group != "API" {
+	if len(got.Blocks) != 3 || got.Blocks[1].Group != "API" {
 		t.Errorf("blocks = %+v", got.Blocks)
 	}
 
-	bad := []Block{{ID: "a", Type: BlockHero}, {ID: "a", Type: BlockHero}, {ID: "Bad id", Type: "chart"}, {ID: "n", Type: BlockNotice}}
+	bad := []Block{{ID: "a", Type: BlockHero}, {ID: "a", Type: BlockHero}, {ID: "Bad id", Type: "chart"}, {ID: "n", Type: BlockNotice}, {ID: "w", Type: BlockHistory, Width: 5}}
 	fields := ValidateBlocks(bad)
-	for _, key := range []string{"blocks.1.id", "blocks.1.type", "blocks.2.id", "blocks.2.type", "blocks.3.body"} {
+	for _, key := range []string{"blocks.1.id", "blocks.1.type", "blocks.2.id", "blocks.2.type", "blocks.3.body", "blocks.4.width"} {
 		if fields[key] == "" {
 			t.Errorf("no error for %s in %v", key, fields)
 		}

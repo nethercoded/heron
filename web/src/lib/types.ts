@@ -70,6 +70,7 @@ export interface Block {
 	style?: string;
 	days?: number;
 	stats?: string;
+	width?: number;
 }
 
 export interface Day {

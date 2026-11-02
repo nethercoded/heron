@@ -1,8 +1,9 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { blockGroups, toneColor } from '#lib/blocks.ts';
+	import { blockGroups, spanClass, toneColor } from '#lib/blocks.ts';
 	import { useI18n } from '#lib/i18n.svelte.ts';
 	import { Clock } from '#lib/live.svelte.ts';
+	import { editable, type InlineEdit } from '#lib/preview.svelte.ts';
 	import { overallCopy } from '#lib/status.ts';
 	import type { Block, Group, Incident, Status, StatusPage } from '#lib/types.ts';
 	import HeronField from './HeronField.svelte';
@@ -16,13 +17,15 @@
 		blocks,
 		recent,
 		editing = false,
-		frame
+		frame,
+		edit
 	}: {
 		data: StatusPage;
 		blocks: Block[];
 		recent: Incident[];
 		editing?: boolean;
 		frame?: Snippet<[Block, number, Snippet]>;
+		edit?: InlineEdit;
 	} = $props();
 
 	const i18n = useI18n();
@@ -107,7 +110,17 @@
 					{i18n.word(overall.tone)}
 				</p>
 				<h1 class="mt-4 font-semibold tracking-tight text-balance {compact ? 'text-3xl leading-tight' : 'text-4xl leading-[1.05] sm:text-5xl'}">{overall.title}</h1>
-				<p class="mt-3 text-ink/60" dir="auto">{data.page.description || overall.detail}</p>
+				{#if edit?.selected === block.id}
+					<p
+						class="mt-3 text-ink/60"
+						dir="auto"
+						contenteditable="plaintext-only"
+						data-placeholder={overall.detail}
+						{@attach editable(data.page.description ?? '', (v) => edit?.text(block.id, 'description', v))}
+					></p>
+				{:else}
+					<p class="mt-3 text-ink/60" dir="auto">{data.page.description || overall.detail}</p>
+				{/if}
 			</div>
 
 			{#if block.stats !== 'hide'}
@@ -135,16 +148,36 @@
 
 {#snippet notice(block: Block)}
 	{@const tone = toneColor[block.tone ?? 'info']}
-	<section class="relative overflow-hidden rounded-card bg-surface px-6 py-5 ps-7">
+	<section class="relative h-full overflow-hidden rounded-card bg-surface px-6 py-5 ps-7">
 		<span class="absolute inset-y-0 start-0 w-1" style="background: {tone}"></span>
-		{#if block.title}
-			<h2 class="flex items-center gap-2.5 font-semibold" dir="auto">
+		{#if edit?.selected === block.id}
+			<div class="flex items-center gap-2.5 font-semibold">
 				<span class="sq" style="--c: {tone}; --s: 8px"></span>
-				{block.title}
-			</h2>
-		{/if}
-		{#if block.body}
-			<p class="whitespace-pre-line text-ink/70 {block.title ? 'mt-1.5' : ''}" dir="auto">{block.body}</p>
+				<span
+					class="min-w-0 flex-1"
+					dir="auto"
+					contenteditable="plaintext-only"
+					data-placeholder="Heading"
+					{@attach editable(block.title ?? '', (v) => edit?.text(block.id, 'title', v))}
+				></span>
+			</div>
+			<p
+				class="mt-1.5 whitespace-pre-line text-ink/70"
+				dir="auto"
+				contenteditable="plaintext-only"
+				data-placeholder="Write the notice"
+				{@attach editable(block.body ?? '', (v) => edit?.text(block.id, 'body', v), true)}
+			></p>
+		{:else}
+			{#if block.title}
+				<h2 class="flex items-center gap-2.5 font-semibold" dir="auto">
+					<span class="sq" style="--c: {tone}; --s: 8px"></span>
+					{block.title}
+				</h2>
+			{/if}
+			{#if block.body}
+				<p class="whitespace-pre-line text-ink/70 {block.title ? 'mt-1.5' : ''}" dir="auto">{block.body}</p>
+			{/if}
 		{/if}
 	</section>
 {/snippet}
@@ -291,13 +324,13 @@
 	{/if}
 {/snippet}
 
-<div class="flex flex-col {editing ? 'gap-3' : 'gap-12'}">
+<div class="grid grid-cols-12 gap-x-6 gap-y-12">
 	{#each visible as { block, index } (block.id)}
 		{#if frame}
 			{#snippet inner()}{@render content(block)}{/snippet}
 			{@render frame(block, index, inner)}
 		{:else}
-			{@render content(block)}
+			<div class={spanClass(block)}>{@render content(block)}</div>
 		{/if}
 	{/each}
 </div>
