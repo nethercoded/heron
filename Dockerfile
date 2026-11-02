@@ -2,7 +2,7 @@
 
 FROM node:26-alpine AS web
 WORKDIR /src/web
-RUN npm install -g pnpm@12
+RUN npm install -g pnpm@12.16.1
 COPY web/package.json web/pnpm-lock.yaml ./
 RUN --mount=type=cache,target=/root/.local/share/pnpm pnpm install --frozen-lockfile
 COPY web/ ./
