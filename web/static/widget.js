@@ -78,7 +78,7 @@
 				const key = item.kind + item.title + item.starts_at;
 				const card = document.createElement('a');
 				card.className = 'card';
-				card.href = item.url;
+				card.href = new URL(item.url, origin).href;
 				card.target = '_blank';
 				card.rel = 'noopener';
 				card.style.setProperty('--tone', palette[item.severity] || palette.major);

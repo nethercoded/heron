@@ -43,8 +43,7 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	base := s.baseURL(r)
-	out := summaryDTO{Title: page.Title, Status: summarize(public, active), URL: base, Items: []summaryItem{}}
+	out := summaryDTO{Title: page.Title, Status: summarize(public, active), URL: "/", Items: []summaryItem{}}
 	for _, inc := range active {
 		if !visible(inc, byID) {
 			continue
@@ -55,7 +54,7 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) error {
 			Severity: string(inc.Impact),
 			StartsAt: stamp(inc.StartedAt),
 			Active:   true,
-			URL:      base + "/incidents/" + strconv.FormatInt(inc.ID, 10),
+			URL:      "/incidents/" + strconv.FormatInt(inc.ID, 10),
 		})
 	}
 	now := time.Now()
@@ -66,7 +65,7 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) error {
 			Severity: "maintenance",
 			StartsAt: mw.StartsAt,
 			Active:   mw.Active,
-			URL:      base,
+			URL:      "/",
 		})
 	}
 
@@ -74,15 +73,4 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) error {
 	h.Set("Access-Control-Allow-Origin", "*")
 	h.Set("Cache-Control", "public, max-age=30")
 	return ok(w, out)
-}
-
-func (s *Server) baseURL(r *http.Request) string {
-	if u := s.opts.PublicURL; u != "" {
-		return u
-	}
-	scheme := "http"
-	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
-		scheme = "https"
-	}
-	return scheme + "://" + r.Host
 }

@@ -3,6 +3,7 @@
 	import Field from '#lib/components/Field.svelte';
 	import { goto, invalidate } from '$app/navigation';
 
+	let code = $state('');
 	let username = $state('admin');
 	let password = $state('');
 	let confirm = $state('');
@@ -20,7 +21,7 @@
 		}
 		busy = true;
 		try {
-			await api.post('/auth/setup', { username, password });
+			await api.post('/auth/setup', { code, username, password });
 			await invalidate('heron:auth');
 			await goto('/admin', { replaceState: true });
 		} catch (err) {
@@ -42,6 +43,17 @@
 		<p class="mt-3 text-ink-2">Create the administrator account to get started.</p>
 	</div>
 
+	<Field label="Setup code" id="code" hint="Printed in the server log on startup, for example journalctl -u heron" error={fields.code}>
+		<input
+			id="code"
+			class="input font-mono tracking-widest uppercase"
+			autocomplete="one-time-code"
+			spellcheck="false"
+			required
+			bind:value={code}
+			aria-invalid={!!fields.code}
+		/>
+	</Field>
 	<Field label="Username" id="username" error={fields.username}>
 		<input id="username" class="input" autocomplete="username" required bind:value={username} aria-invalid={!!fields.username} />
 	</Field>

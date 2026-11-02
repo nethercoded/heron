@@ -79,7 +79,7 @@ type harness struct {
 	sched  *fakeScheduler
 }
 
-func newHarness(t *testing.T) *harness {
+func newHarness(t *testing.T, configure ...func(*Options)) *harness {
 	t.Helper()
 	db, err := store.Open(t.Context(), filepath.Join(t.TempDir(), "heron.db"))
 	if err != nil {
@@ -95,7 +95,11 @@ func newHarness(t *testing.T) *harness {
 		"_app/immutable/app.js":    {Data: []byte("console.log(1)")},
 		"_app/immutable/app.js.br": {Data: []byte("brotli")},
 	}
-	api := New(db, eng, sched, nopSender{}, auth.NewSessions(db, false), log, Options{Version: "test", Assets: assets})
+	opts := Options{Version: "test", Assets: assets}
+	for _, fn := range configure {
+		fn(&opts)
+	}
+	api := New(db, eng, sched, nopSender{}, auth.NewSessions(db, false), log, opts)
 
 	srv := httptest.NewServer(api.Handler())
 	t.Cleanup(srv.Close)
@@ -177,6 +181,18 @@ func TestSetupAndLogin(t *testing.T) {
 	h.expect("GET", "/api/admin/monitors", nil, http.StatusOK, nil)
 }
 
+func TestSetupRequiresCode(t *testing.T) {
+	h := newHarness(t, func(o *Options) { o.SetupCode = "ABCDEF123456" })
+
+	var apiErr Error
+	h.expect("POST", "/api/auth/setup", setupInput{credentials: credentials{Username: "admin", Password: "correct horse battery"}}, http.StatusForbidden, &apiErr)
+	if apiErr.Fields["code"] == "" {
+		t.Errorf("fields = %v", apiErr.Fields)
+	}
+	h.expect("POST", "/api/auth/setup", setupInput{credentials: credentials{Username: "admin", Password: "correct horse battery"}, Code: "wrong"}, http.StatusForbidden, nil)
+	h.expect("POST", "/api/auth/setup", setupInput{credentials: credentials{Username: "admin", Password: "correct horse battery"}, Code: " ABCDEF123456 "}, http.StatusCreated, nil)
+}
+
 func TestLoginRateLimit(t *testing.T) {
 	h := newHarness(t)
 	h.signIn()
@@ -203,7 +219,7 @@ func TestMonitorFlow(t *testing.T) {
 	h.expect("POST", "/api/admin/monitors", monitorInput{
 		Name: "Website", Kind: monitor.KindHTTP, Target: "https://example.com", IntervalS: 60, Public: true, Group: "Frontend",
 	}, http.StatusCreated, &site)
-	if site.Slug != "website" || site.Settings.Method != "GET" || site.Status != monitor.StatusPending {
+	if site.Slug != "website" || site.Settings.Method != http.MethodGet || site.Status != monitor.StatusPending {
 		t.Fatalf("created = %+v", site)
 	}
 	h.expect("POST", "/api/admin/monitors", monitorInput{Name: "Website", Kind: monitor.KindTCP, Target: "db:5432"}, http.StatusUnprocessableEntity, &apiErr)
@@ -362,7 +378,7 @@ func TestBadgesAndSummary(t *testing.T) {
 	if err := json.Unmarshal([]byte(body), &summary); err != nil {
 		t.Fatal(err)
 	}
-	if summary.Status != overallOperational || len(summary.Items) != 0 || !strings.HasPrefix(summary.URL, "http://") {
+	if summary.Status != overallOperational || len(summary.Items) != 0 || summary.URL != "/" {
 		t.Errorf("summary = %+v", summary)
 	}
 }
@@ -421,7 +437,7 @@ func TestCrossOriginRejected(t *testing.T) {
 	h := newHarness(t)
 	h.signIn()
 
-	req, _ := http.NewRequestWithContext(t.Context(), "POST", h.srv.URL+"/api/admin/monitors", strings.NewReader(`{}`))
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, h.srv.URL+"/api/admin/monitors", strings.NewReader(`{}`))
 	req.Header.Set("Origin", "https://evil.example")
 	req.Header.Set("Sec-Fetch-Site", "cross-site")
 	resp, err := h.client.Do(req)
@@ -444,7 +460,7 @@ func TestSPA(t *testing.T) {
 		}
 	}
 
-	req, _ := http.NewRequestWithContext(t.Context(), "GET", h.srv.URL+"/_app/immutable/app.js", nil)
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, h.srv.URL+"/_app/immutable/app.js", nil)
 	req.Header.Set("Accept-Encoding", "br")
 	resp, err := http.DefaultTransport.RoundTrip(req)
 	if err != nil {

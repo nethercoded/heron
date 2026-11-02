@@ -33,7 +33,7 @@ func NewSessions(s *store.Store, secure bool) *Sessions {
 func (s *Sessions) Login(ctx context.Context, w http.ResponseWriter, username, password string) (*store.User, error) {
 	user, err := s.store.UserByName(ctx, username)
 	if errors.Is(err, store.ErrNotFound) {
-		Verify(s.dummy, password)
+		_, _ = Verify(s.dummy, password)
 		return nil, ErrInvalidCredentials
 	}
 	if err != nil {
@@ -81,11 +81,10 @@ func (s *Sessions) User(ctx context.Context, w http.ResponseWriter, r *http.Requ
 
 func (s *Sessions) Logout(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 	http.SetCookie(w, s.cookie("", time.Unix(1, 0)))
-	c, err := r.Cookie(CookieName)
-	if err != nil {
-		return nil
+	if c, err := r.Cookie(CookieName); err == nil {
+		return s.store.DeleteSession(ctx, digest(c.Value))
 	}
-	return s.store.DeleteSession(ctx, digest(c.Value))
+	return nil
 }
 
 func (s *Sessions) Revoke(ctx context.Context, r *http.Request, userID int64) error {

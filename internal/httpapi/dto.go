@@ -269,6 +269,11 @@ type credentials struct {
 	Password string `json:"password"`
 }
 
+type setupInput struct {
+	credentials
+	Code string `json:"code"`
+}
+
 type userDTO struct {
 	Username string `json:"username"`
 }

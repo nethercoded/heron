@@ -40,7 +40,13 @@ heron watches your websites, APIs, servers and cron jobs, keeps the history, and
 curl -fsSL https://raw.githubusercontent.com/nethercode/heron/main/deploy/install.sh | sudo sh
 ```
 
-The script downloads the latest release, verifies its checksum, creates a `heron` system user, writes `/etc/heron/heron.toml` and starts the service. Open `http://your-server:8080/admin` and create the administrator account.
+The script downloads the latest release, verifies its checksum, creates a `heron` system user, writes `/etc/heron/heron.toml` and starts the service. Open `http://your-server:8080/admin` and create the administrator account. The form asks for a one-time setup code that heron prints to its log on startup, so nobody else can claim a fresh install:
+
+```sh
+journalctl -u heron | grep setup_code
+```
+
+With Docker, run `docker logs heron`. You can also skip the form and create the account from the shell with `heron user create -u admin`.
 
 ### Docker
 

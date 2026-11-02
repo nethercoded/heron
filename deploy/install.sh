@@ -56,4 +56,7 @@ systemctl enable --now heron >/dev/null 2>&1
 systemctl restart heron
 
 say "heron $("$BIN_DIR/heron" version | cut -d' ' -f2) is running"
+sleep 1
+code=$(journalctl -u heron -n 50 --no-pager 2>/dev/null | sed -n 's/.*setup_code[=":]*\([A-Z0-9]*\).*/\1/p' | tail -n1)
 say "open http://$(hostname -I 2>/dev/null | cut -d' ' -f1):8080/admin to create the administrator"
+[ -n "$code" ] && say "setup code: $code"

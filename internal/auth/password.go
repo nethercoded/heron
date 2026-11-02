@@ -22,7 +22,18 @@ type Params struct {
 
 var DefaultParams = Params{Memory: 19 * 1024, Time: 2, Threads: 1, KeyLen: 32}
 
-const MinPasswordLength = 10
+const (
+	MinPasswordLength = 10
+	maxPasswordLength = 256
+)
+
+var hashing = make(chan struct{}, 2)
+
+func derive(password string, salt []byte, p Params, keyLen uint32) []byte {
+	hashing <- struct{}{}
+	defer func() { <-hashing }()
+	return argon2.IDKey([]byte(password), salt, p.Time, p.Memory, p.Threads, keyLen)
+}
 
 func Hash(password string) (string, error) {
 	return DefaultParams.Hash(password)
@@ -33,7 +44,7 @@ func (p Params) Hash(password string) (string, error) {
 	if _, err := rand.Read(salt); err != nil {
 		return "", err
 	}
-	key := argon2.IDKey([]byte(password), salt, p.Time, p.Memory, p.Threads, p.KeyLen)
+	key := derive(password, salt, p, p.KeyLen)
 	enc := base64.RawStdEncoding
 	return fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s",
 		argon2.Version, p.Memory, p.Time, p.Threads, enc.EncodeToString(salt), enc.EncodeToString(key)), nil
@@ -54,6 +65,12 @@ func Verify(encoded, password string) (bool, error) {
 	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &p.Memory, &p.Time, &p.Threads); err != nil {
 		return false, ErrMalformedHash
 	}
+	if p.Memory > 256*1024 || p.Time > 10 || p.Threads == 0 {
+		return false, ErrMalformedHash
+	}
+	if len(password) > maxPasswordLength {
+		return false, nil
+	}
 
 	enc := base64.RawStdEncoding
 	salt, err := enc.DecodeString(parts[4])
@@ -65,13 +82,16 @@ func Verify(encoded, password string) (bool, error) {
 		return false, ErrMalformedHash
 	}
 
-	got := argon2.IDKey([]byte(password), salt, p.Time, p.Memory, p.Threads, uint32(len(want)))
+	got := derive(password, salt, p, uint32(len(want)))
 	return subtle.ConstantTimeCompare(got, want) == 1, nil
 }
 
 func CheckStrength(password string) error {
 	if len([]rune(password)) < MinPasswordLength {
 		return fmt.Errorf("password must be at least %d characters", MinPasswordLength)
+	}
+	if len(password) > maxPasswordLength {
+		return fmt.Errorf("password must be at most %d bytes", maxPasswordLength)
 	}
 	return nil
 }

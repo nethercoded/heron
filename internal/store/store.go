@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/url"
+	"os"
 	"path"
 	"slices"
 	"strconv"
@@ -46,14 +47,18 @@ func Open(ctx context.Context, file string) (*Store, error) {
 
 	s := &Store{db: db}
 	if err := s.migrate(ctx); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("migrate: %w", err)
+		return nil, errors.Join(fmt.Errorf("migrate: %w", err), db.Close())
+	}
+	for _, suffix := range []string{"", "-wal", "-shm"} {
+		if err := os.Chmod(file+suffix, 0o600); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, errors.Join(fmt.Errorf("restrict database permissions: %w", err), db.Close())
+		}
 	}
 	return s, nil
 }
 
 func (s *Store) Close() error {
-	if _, err := s.db.Exec("pragma optimize"); err != nil {
+	if _, err := s.db.ExecContext(context.Background(), "pragma optimize"); err != nil {
 		return errors.Join(err, s.db.Close())
 	}
 	return s.db.Close()

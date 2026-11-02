@@ -28,7 +28,7 @@ type Sender interface {
 
 type Options struct {
 	Version        string
-	PublicURL      string
+	SetupCode      string
 	Location       *time.Location
 	TrustedProxies []netip.Prefix
 	Assets         fs.FS

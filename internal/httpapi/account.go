@@ -1,10 +1,11 @@
 package httpapi
 
 import (
+	"crypto/subtle"
 	"errors"
-	"fmt"
 	"math"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/nethercode/heron/internal/auth"
@@ -32,12 +33,20 @@ func (s *Server) authState(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) setup(w http.ResponseWriter, r *http.Request) error {
-	var in credentials
+	if allowed, _ := s.limiter.Allow("setup:" + s.clientIP(r)); !allowed {
+		return errorf(http.StatusTooManyRequests, "rate_limited", "too many attempts, try again later")
+	}
+
+	var in setupInput
 	if err := decode(w, r, &in); err != nil {
 		return err
 	}
+	if code := s.opts.SetupCode; code != "" && subtle.ConstantTimeCompare([]byte(strings.ToUpper(strings.TrimSpace(in.Code))), []byte(code)) != 1 {
+		s.log.Warn("setup attempt with a wrong code", "ip", s.clientIP(r))
+		return &Error{Status: http.StatusForbidden, Code: "invalid", Message: "validation failed", Fields: map[string]string{"code": "does not match the code in the server log"}}
+	}
 	in.Username = strings.TrimSpace(in.Username)
-	if err := validateCredentials(in); err != nil {
+	if err := validateCredentials(in.credentials); err != nil {
 		return err
 	}
 
@@ -62,7 +71,7 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) error {
 func (s *Server) login(w http.ResponseWriter, r *http.Request) error {
 	ip := s.clientIP(r)
 	if allowed, retry := s.limiter.Allow(ip); !allowed {
-		w.Header().Set("Retry-After", fmt.Sprint(int(math.Ceil(retry.Seconds()))))
+		w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(retry.Seconds()))))
 		return errorf(http.StatusTooManyRequests, "rate_limited", "too many attempts, try again in %d minutes", int(math.Ceil(retry.Minutes())))
 	}
 
