@@ -10,17 +10,19 @@
 
 	let { groups, active }: { groups: NavGroup[]; active: string } = $props();
 
+	let root = $state<HTMLDivElement>();
 	let links = $state<Record<string, HTMLAnchorElement>>({});
 	let pill = $state({ top: 0, height: 0, animate: false });
 	let settled = false;
 
 	function place() {
 		const el = links[active];
-		if (!el) {
+		if (!el || !root) {
 			pill = { top: 0, height: 0, animate: false };
 			return;
 		}
-		pill = { top: el.offsetTop, height: el.offsetHeight, animate: settled };
+		const top = el.getBoundingClientRect().top - root.getBoundingClientRect().top;
+		pill = { top, height: el.offsetHeight, animate: settled };
 		settled = true;
 	}
 
@@ -28,12 +30,12 @@
 		void active;
 		place();
 		const ro = new ResizeObserver(place);
-		for (const el of Object.values(links)) ro.observe(el);
+		if (root) ro.observe(root);
 		return () => ro.disconnect();
 	});
 </script>
 
-<div class="relative">
+<div class="relative" bind:this={root}>
 	<span
 		class="pointer-events-none absolute inset-x-0 rounded-ctl bg-ink {pill.animate ? 'transition-[top,height] duration-500 ease-[cubic-bezier(0.34,1.32,0.5,1)]' : ''}"
 		style="top: {pill.top}px; height: {pill.height}px; opacity: {pill.height ? 1 : 0}"
@@ -41,7 +43,7 @@
 	></span>
 
 	{#each groups as group (group.title)}
-		<nav class="relative flex flex-col gap-1.5 {group.title ? 'mt-5' : ''}" aria-label={group.title || 'Navigation'}>
+		<nav class="flex flex-col gap-1.5 {group.title ? 'mt-5' : ''}" aria-label={group.title || 'Navigation'}>
 			{#if group.title}
 				<p class="px-3 pb-0.5 text-[11px] font-semibold tracking-[0.08em] text-faint uppercase">{group.title}</p>
 			{/if}
