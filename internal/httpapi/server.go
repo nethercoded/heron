@@ -14,6 +14,7 @@ import (
 	"github.com/nethercoded/heron/internal/notify"
 	"github.com/nethercoded/heron/internal/site"
 	"github.com/nethercoded/heron/internal/store"
+	"github.com/nethercoded/heron/internal/update"
 )
 
 type Scheduler interface {
@@ -34,6 +35,7 @@ type Options struct {
 	Location       *time.Location
 	TrustedProxies []netip.Prefix
 	Assets         fs.FS
+	Updates        *update.Service
 }
 
 type Server struct {
@@ -168,6 +170,11 @@ func (s *Server) Handler() http.Handler {
 	admin.Handle("DELETE /api/admin/users/{id}/two-factor", owner("user.2fa_reset", s.resetTwoFactor))
 
 	admin.Handle("GET /api/admin/audit", s.handle(s.listAudit))
+
+	admin.Handle("GET /api/admin/updates", s.handle(s.role(store.RoleOwner, s.getUpdates)))
+	admin.Handle("POST /api/admin/updates/check", s.handle(s.role(store.RoleOwner, s.checkUpdates)))
+	admin.Handle("PUT /api/admin/updates", owner("settings.auto_update", s.saveUpdates))
+	admin.Handle("POST /api/admin/updates/install", owner("update.install", s.installUpdate))
 
 	mux.Handle("/api/admin/", s.requireAdmin(admin))
 	mux.Handle("/api/", s.handle(func(http.ResponseWriter, *http.Request) error {

@@ -6,6 +6,7 @@
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import SecuritySettings from '#lib/components/SecuritySettings.svelte';
 	import Snippet from '#lib/components/Snippet.svelte';
+	import UpdateSettings from '#lib/components/UpdateSettings.svelte';
 	import { badgeMarkdown, widgetSnippet } from '#lib/embed.ts';
 	import { canEdit } from '#lib/team.ts';
 	import { toast } from '#lib/toast.svelte.ts';
@@ -119,6 +120,10 @@
 			<button class="btn-primary" disabled={siteBusy}>{siteBusy ? 'Checking…' : 'Save domain'}</button>
 		</div>
 	</form>
+
+	{#if data.updates}
+		<UpdateSettings updates={data.updates} />
+	{/if}
 	{/if}
 
 	{#if editor}

@@ -291,3 +291,22 @@ export interface LiveMonitor {
 	id?: number;
 	message?: string;
 }
+
+export interface Release {
+	version: string;
+	url: string;
+	notes: string;
+	published_at: string;
+}
+
+export interface Updates {
+	current: string;
+	latest: Release | null;
+	available: boolean;
+	checked_at?: string;
+	error?: string;
+	blocked?: string;
+	busy: boolean;
+	failed?: string;
+	auto: boolean;
+}

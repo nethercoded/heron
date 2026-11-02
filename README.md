@@ -42,6 +42,8 @@ It checks your sites, APIs, databases, containers and game servers, keeps a year
 
 **Three languages.** The public page speaks English, Russian and Hebrew, with proper right-to-left layout. It picks the visitor's language on its own and remembers the choice.
 
+**Updates.** heron notices new releases on GitHub and can install them by itself. The owner sees the release notes in the panel and updates with one click, or lets heron do it on its own.
+
 **Extras.** SVG badges for your README, a small script that shows a notice on your own website during an outage, a `/metrics` endpoint for Prometheus and Grafana, and a dark admin panel that matches the public page.
 
 <p align="center">
@@ -173,6 +175,7 @@ Most things are set in the panel. The few that belong to the server live in `her
 | `retention_days`  | `HERON_RETENTION_DAYS`  | `7`      | How long raw checks are kept. Hourly totals stay for a year     |
 | `trusted_proxies` | `HERON_TRUSTED_PROXIES` |          | Proxies allowed to set `X-Forwarded-For`                        |
 | `icmp_privileged` | `HERON_ICMP_PRIVILEGED` | `false`  | Use raw sockets for ping, needs `CAP_NET_RAW`                    |
+| `check_updates`   | `HERON_CHECK_UPDATES`   | `true`   | Look for new releases on GitHub every six hours                 |
 | `log_level`       | `HERON_LOG_LEVEL`       | `info`   | `debug`, `info`, `warn` or `error`                              |
 | `log_format`      | `HERON_LOG_FORMAT`      | `text`   | `text` or `json`                                                |
 
@@ -242,6 +245,23 @@ scrape_configs:
 
 You get `heron_monitor_up`, `heron_monitor_status`, `heron_monitor_latency_seconds`, `heron_monitor_uptime_ratio` for 24 hours and 30 days, `heron_monitor_last_check_timestamp_seconds` and `heron_incidents_open`. Every monitor series carries `monitor`, `name`, `kind` and `group` labels.
 
+## Updates
+
+heron asks GitHub for the latest release a minute after it starts and every six hours after that. When there is a new one, the owner sees a green dot next to the version in the sidebar and the release notes in **Settings, Updates**.
+
+Press **Update** and heron downloads the archive for your platform, checks it against `checksums.txt` from the same release, makes sure the new binary starts, and restarts on it. The panel and the status page are gone for a few seconds and come back on the new version. Turn on **Install updates automatically** and heron does all of this without you.
+
+The new binary goes to `bin/heron` inside the data directory, so the service user can write it without root. The installer's systemd unit and the Docker image both work this way, and the update survives restarts: on every start heron runs the newest binary it has. If you later install a newer version over `/usr/local/bin/heron` by hand, the old download is thrown away.
+
+You can also update from a shell:
+
+```bash
+sudo heron update
+sudo systemctl restart heron
+```
+
+`heron update -check` only tells you whether there is something new. Set `check_updates = false` if the server should never talk to GitHub on its own.
+
 ## Webhooks
 
 Webhook channels receive a JSON `POST` every time a monitor goes down or comes back:
@@ -270,6 +290,7 @@ heron serve                    start the server
 heron user create -u name      create an account without the installer
 heron user passwd -u name      reset a password and sign out every session
 heron user reset-2fa -u name   turn off two-factor sign in for someone
+heron update [-check]         download the latest release over the binary
 heron version                  print the version
 ```
 

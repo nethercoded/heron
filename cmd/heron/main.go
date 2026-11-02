@@ -32,6 +32,7 @@ import (
 	"github.com/nethercoded/heron/internal/scheduler"
 	"github.com/nethercoded/heron/internal/site"
 	"github.com/nethercoded/heron/internal/store"
+	"github.com/nethercoded/heron/internal/update"
 	"github.com/nethercoded/heron/web"
 )
 
@@ -44,6 +45,7 @@ Usage:
   heron user create -u name [-config]   create an administrator
   heron user passwd -u name [-config]   change a password
   heron user reset-2fa -u name          turn off two-factor sign in
+  heron update [-check]                 download the latest release in place
   heron version                         print the version
 
 The config file defaults to $HERON_CONFIG or ./heron.toml.
@@ -64,9 +66,15 @@ func run(args []string) error {
 
 	switch cmd {
 	case "serve":
-		return serve(args)
+		err := serve(args)
+		if next, ok := errors.AsType[*update.Restart](err); ok {
+			return update.Exec(next.Path)
+		}
+		return err
 	case "user":
 		return user(args)
+	case "update":
+		return selfUpdate(args)
 	case "version":
 		fmt.Println("heron", buildVersion())
 		return nil
@@ -117,6 +125,11 @@ func serve(args []string) error {
 	log := newLogger(cfg)
 	slog.SetDefault(log)
 
+	ver := buildVersion()
+	if err := update.Handoff(cfg.DataDir, ver); err != nil {
+		log.Warn("could not start the downloaded update, staying on the current version", "err", err)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -126,7 +139,6 @@ func serve(args []string) error {
 	}
 	defer db.Close()
 
-	ver := buildVersion()
 	userAgent := "heron/" + ver + " (+https://github.com/nethercoded/heron)"
 
 	dispatcher := notify.NewDispatcher(notify.Factory{
@@ -150,6 +162,24 @@ func serve(args []string) error {
 	go eng.Housekeep(runCtx, time.Duration(cfg.RetentionDays)*24*time.Hour)
 	go eng.WatchMaintenance(runCtx)
 
+	restart := make(chan string, 1)
+	updates := &update.Service{
+		Updater: update.New(ver, userAgent),
+		DataDir: cfg.DataDir,
+		Every:   6 * time.Hour,
+		Auto:    db.AutoUpdate,
+		Restart: func(path string) {
+			select {
+			case restart <- path:
+			default:
+			}
+		},
+		Log: log.With("component", "update"),
+	}
+	if cfg.CheckUpdates {
+		go updates.Run(runCtx)
+	}
+
 	users, err := db.CountUsers(ctx)
 	if err != nil {
 		cancelRun()
@@ -170,6 +200,7 @@ func serve(args []string) error {
 		Location:       cfg.Location,
 		TrustedProxies: cfg.Proxies,
 		Assets:         web.Assets(),
+		Updates:        updates,
 	})
 	handler := api.Handler()
 	domains.Handler = handler
@@ -204,12 +235,14 @@ func serve(args []string) error {
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- srv.Serve(ln) }()
 
+	var next string
 	select {
 	case err := <-serveErr:
 		cancelRun()
 		sched.Wait()
 		return err
 	case <-ctx.Done():
+	case next = <-restart:
 	}
 
 	log.Info("shutting down")
@@ -221,10 +254,58 @@ func serve(args []string) error {
 	errs := []error{srv.Shutdown(shutdownCtx)}
 	sched.Wait()
 	errs = append(errs, dispatcher.Close(shutdownCtx))
-	if err := errors.Join(errs...); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return err
+	err = errors.Join(errs...)
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if next == "" {
+			return err
+		}
+		log.Warn("unclean shutdown before the update", "err", err)
+	}
+	if next != "" {
+		log.Info("starting the new version", "path", next)
+		return &update.Restart{Path: next}
 	}
 	log.Info("bye")
+	return nil
+}
+
+func selfUpdate(args []string) error {
+	fs := flag.NewFlagSet("update", flag.ExitOnError)
+	check := fs.Bool("check", false, "only report whether a newer release exists")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	ver := buildVersion()
+	u := update.New(ver, "heron/"+ver+" (+https://github.com/nethercoded/heron)")
+	ctx := context.Background()
+	rel, err := u.Latest(ctx)
+	if err != nil {
+		return fmt.Errorf("check for updates: %w", err)
+	}
+	if !u.Newer(rel) {
+		fmt.Printf("heron %s is up to date (latest release %s)\n", ver, rel.Version())
+		return nil
+	}
+	fmt.Printf("heron %s is available, you run %s\n%s\n", rel.Version(), ver, rel.URL)
+	if *check {
+		return nil
+	}
+
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	if exe, err = filepath.EvalSymlinks(exe); err != nil {
+		return err
+	}
+	if err := u.Download(ctx, rel, exe); err != nil {
+		if errors.Is(err, os.ErrPermission) {
+			return fmt.Errorf("%w, run it as root: sudo heron update", err)
+		}
+		return err
+	}
+	fmt.Printf("updated %s to %s, restart heron to use it (systemctl restart heron)\n", exe, rel.Version())
 	return nil
 }
 

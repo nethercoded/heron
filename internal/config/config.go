@@ -25,6 +25,7 @@ type Config struct {
 	RetentionDays  int      `toml:"retention_days"`
 	TrustedProxies []string `toml:"trusted_proxies"`
 	ICMPPrivileged bool     `toml:"icmp_privileged"`
+	CheckUpdates   bool     `toml:"check_updates"`
 
 	Location *time.Location `toml:"-"`
 	Proxies  []netip.Prefix `toml:"-"`
@@ -38,6 +39,7 @@ func Default() Config {
 		LogFormat:     "text",
 		Timezone:      "UTC",
 		RetentionDays: 7,
+		CheckUpdates:  true,
 	}
 }
 
@@ -84,6 +86,13 @@ func (c *Config) applyEnv(lookup func(string) (string, bool)) error {
 			return fmt.Errorf("HERON_ICMP_PRIVILEGED: %w", err)
 		}
 		c.ICMPPrivileged = b
+	}
+	if v, ok := lookup("HERON_CHECK_UPDATES"); ok {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return fmt.Errorf("HERON_CHECK_UPDATES: %w", err)
+		}
+		c.CheckUpdates = b
 	}
 	if v, ok := lookup("HERON_TRUSTED_PROXIES"); ok {
 		c.TrustedProxies = strings.FieldsFunc(v, func(r rune) bool { return r == ',' || r == ' ' })

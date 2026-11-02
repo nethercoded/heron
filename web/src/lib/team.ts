@@ -52,7 +52,9 @@ const actions: Record<string, string> = {
 	'settings.domain': 'changed the domain to',
 	'settings.page': 'edited the status page',
 	'settings.metrics_token': 'issued a new metrics token',
-	'settings.metrics_off': 'turned off metrics'
+	'settings.metrics_off': 'turned off metrics',
+	'settings.auto_update': 'turned automatic updates',
+	'update.install': 'installed heron'
 };
 
 export const actionLabel = (action: string) => actions[action] ?? action;
@@ -74,7 +76,8 @@ export const auditGroups = [
 	{ value: 'channel', label: 'Notifications' },
 	{ value: 'user', label: 'People' },
 	{ value: 'account', label: 'Account security' },
-	{ value: 'settings', label: 'Settings' }
+	{ value: 'settings', label: 'Settings' },
+	{ value: 'update', label: 'Updates' }
 ];
 
 export function actionTone(action: string) {

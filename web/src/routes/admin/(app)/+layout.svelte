@@ -99,7 +99,18 @@
 		<div class="mt-3 flex flex-col gap-2.5">
 			<div class="flex items-center justify-between px-3">
 				{@render liveState()}
-				<span class="font-mono text-[11px] text-faint">{data.version}</span>
+				{#if data.updates?.available && data.updates.latest}
+					<a
+						href="/admin/settings#updates"
+						title="heron {data.updates.latest.version} is available"
+						class="flex items-center gap-1.5 font-mono text-[11px] text-ink hover:underline"
+					>
+						<span class="sq" style="--c: var(--color-up); --s: 6px"></span>
+						{data.updates.latest.version}
+					</a>
+				{:else}
+					<span class="font-mono text-[11px] text-faint">{data.version}</span>
+				{/if}
 			</div>
 			<a
 				href="/"

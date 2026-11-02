@@ -85,3 +85,21 @@ func (s *Store) SetMetricsToken(ctx context.Context, token string) error {
 	_, err := s.db.ExecContext(ctx, `insert into settings (key, value) values ('metrics_token', ?) on conflict (key) do update set value = excluded.value`, token)
 	return err
 }
+
+func (s *Store) AutoUpdate(ctx context.Context) (bool, error) {
+	var value string
+	err := s.db.QueryRowContext(ctx, `select value from settings where key = 'auto_update'`).Scan(&value)
+	if errors.Is(translate(err), ErrNotFound) {
+		return false, nil
+	}
+	return value == "on", err
+}
+
+func (s *Store) SetAutoUpdate(ctx context.Context, on bool) error {
+	if !on {
+		_, err := s.db.ExecContext(ctx, `delete from settings where key = 'auto_update'`)
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `insert into settings (key, value) values ('auto_update', 'on') on conflict (key) do update set value = excluded.value`)
+	return err
+}
