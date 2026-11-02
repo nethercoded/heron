@@ -36,10 +36,68 @@ It checks your sites, APIs, databases, containers and game servers, keeps a year
 
 **Alerts.** Telegram (topics in forum groups work too) and signed webhooks, with retries. A monitor only counts as down after the number of failed checks you choose, so a single hiccup does not wake you up.
 
-**Extras.** SVG badges for your README, a small script that shows a notice on your own website during an outage, and a dark admin panel that matches the public page.
+**Team.** Invite people with a one-time link and give them a role. Owners manage people and the domain, admins run monitors and incidents, viewers can look around but not touch anything. An audit log keeps a year of who changed what.
+
+**Sign-in security.** Two-factor codes from any authenticator app, and passkeys, so you can sign in with Face ID, Touch ID, Windows Hello or a hardware key instead of a password.
+
+**Three languages.** The public page speaks English, Russian and Hebrew, with proper right-to-left layout. It picks the visitor's language on its own and remembers the choice.
+
+**Extras.** SVG badges for your README, a small script that shows a notice on your own website during an outage, a `/metrics` endpoint for Prometheus and Grafana, and a dark admin panel that matches the public page.
 
 <p align="center">
   <img src="docs/monitor.png" width="860" alt="A monitor with its response time chart and uptime calendar">
+</p>
+
+## The admin panel
+
+All monitors on one screen. Filter them by type or group, search by name or address, and drag rows to change the order on the public page.
+
+<p align="center">
+  <img src="docs/monitors.png" width="860" alt="The list of monitors in the admin panel">
+</p>
+
+## Working as a team
+
+Open **People**, pick a role and create a link. It works once and expires after 72 hours, so you can send it in any chat. Whoever opens it chooses their own username and password and lands straight in the panel.
+
+| Role   | What they can do                                                         |
+| ------ | ------------------------------------------------------------------------ |
+| Owner  | Everything, plus inviting and removing people and changing the domain    |
+| Admin  | Monitors, incidents, maintenance, notifications and the status page      |
+| Viewer | Sees the panel, cannot change anything. Passwords and tokens stay hidden |
+
+The first account created during setup is the owner. From the same page the owner can change roles, sign someone out on every device or reset their two-factor if they lost their phone.
+
+<p align="center">
+  <img src="docs/people.png" width="860" alt="The People page with roles and a pending invite">
+</p>
+
+Every change lands in the **Audit log**: monitors, incidents, maintenance, settings, people, and sign ins including failed ones. You can filter it by kind of activity or by person.
+
+<p align="center">
+  <img src="docs/audit.png" width="860" alt="The audit log">
+</p>
+
+## Signing in safely
+
+Each person turns these on for themselves under **Settings, Sign-in security**.
+
+**Authenticator app.** Scan the QR code with Google Authenticator, 1Password, Aegis or anything that speaks TOTP. From then on heron asks for a six digit code after the password, and a code can only be used once.
+
+**Passkeys.** Add one per device. The sign in page gets a "Sign in with a passkey" button that skips the password entirely. Browsers only allow passkeys over HTTPS, so set up a domain first.
+
+Locked out of your own two-factor? On the server:
+
+```sh
+sudo -u heron heron user reset-2fa -u yourname
+```
+
+## Languages
+
+The switcher in the top corner of the public page offers English, Russian and Hebrew. Hebrew flips the whole layout to right-to-left. Only the interface is translated. Monitor names, incident updates and your page description stay exactly as you wrote them. The admin panel is in English.
+
+<p align="center">
+  <img src="docs/status-he.png" width="860" alt="The status page in Hebrew">
 </p>
 
 ## Getting it running
@@ -60,7 +118,7 @@ The installer walks you through seven short steps:
 
 1. **Setup code.** Proves you are the one who owns the server, so nobody can grab a fresh install before you do.
 2. **Domain.** Enter something like `status.example.com`. heron checks that the record points at the server, gets a certificate from Let's Encrypt, starts serving HTTPS on ports 80 and 443 and moves you over to the new address. If you already run nginx or Caddy, pick the reverse proxy option and heron will only remember the address.
-3. **Administrator.** Your username and password.
+3. **Administrator.** Your username and password. This account becomes the owner.
 4. **Status page.** Title, description and an optional logo.
 5. **First monitor.** Any URL you care about.
 6. **Alerts.** A Telegram bot token and chat. heron sends a test message straight away.
@@ -167,6 +225,23 @@ The widget stays hidden while everything is fine and shows a small card on your 
 
 You can move it with `data-position`, announce planned work early with `data-upcoming="true"` and change how often it refreshes with `data-refresh` (in seconds).
 
+## Prometheus and Grafana
+
+`/metrics` is off until you ask for it. Go to **Settings, Prometheus**, press **Turn on** and copy the scrape config heron shows you:
+
+```yaml
+scrape_configs:
+  - job_name: heron
+    scheme: https
+    metrics_path: /metrics
+    authorization:
+      credentials: <token>
+    static_configs:
+      - targets: ['status.example.com']
+```
+
+You get `heron_monitor_up`, `heron_monitor_status`, `heron_monitor_latency_seconds`, `heron_monitor_uptime_ratio` for 24 hours and 30 days, `heron_monitor_last_check_timestamp_seconds` and `heron_incidents_open`. Every monitor series carries `monitor`, `name`, `kind` and `group` labels.
+
 ## Webhooks
 
 Webhook channels receive a JSON `POST` every time a monitor goes down or comes back:
@@ -191,10 +266,11 @@ These talk to the Docker API, by default through `/var/run/docker.sock`. Add the
 ## Command line
 
 ```
-heron serve                 start the server
-heron user create -u name   create an administrator without the installer
-heron user passwd -u name   reset a password and sign out every session
-heron version               print the version
+heron serve                    start the server
+heron user create -u name      create an account without the installer
+heron user passwd -u name      reset a password and sign out every session
+heron user reset-2fa -u name   turn off two-factor sign in for someone
+heron version                  print the version
 ```
 
 ## Working on heron
