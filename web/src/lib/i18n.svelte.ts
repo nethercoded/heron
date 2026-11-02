@@ -621,9 +621,15 @@ export class I18n {
 
 	latency(ms: number | undefined) {
 		if (!ms) return '—';
-		return ms >= 1000
-			? `${this.number(ms / 1000, 2)} ${this.t('unit.s')}`
-			: `${this.number(Math.round(ms))} ${this.t('unit.ms')}`;
+		return this.#isolate(
+			ms >= 1000
+				? `${this.number(ms / 1000, 2)} ${this.t('unit.s')}`
+				: `${this.number(Math.round(ms))} ${this.t('unit.ms')}`
+		);
+	}
+
+	#isolate(text: string) {
+		return this.dir === 'rtl' ? `⁦${text}⁩` : text;
 	}
 
 	axis(ms: number) {

@@ -54,7 +54,7 @@
 					<p class="text-[13px] font-semibold {update.status === 'resolved' ? 'text-up' : 'text-ink'}">{i18n.incident(update.status)}</p>
 					<time class="text-xs text-faint" datetime={update.created_at}>{i18n.dateTime(update.created_at)}</time>
 				</div>
-				<p class="mt-1 leading-relaxed text-muted sm:mt-0">{update.body}</p>
+				<p class="mt-1 leading-relaxed text-muted sm:mt-0" dir="auto">{update.body}</p>
 			</li>
 		{/each}
 		{#if !expanded && incident.updates.length > updates.length && href}

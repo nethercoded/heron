@@ -83,7 +83,7 @@
 		<p class="text-xs font-medium tracking-wide text-faint uppercase">{m.group || kindLabel[m.kind]}</p>
 		<h1 class="mt-1 text-2xl font-semibold tracking-tight">{m.name}</h1>
 		{#if m.description}
-			<p class="mt-1 text-muted">{m.description}</p>
+			<p class="mt-1 text-muted" dir="auto">{m.description}</p>
 		{/if}
 	</div>
 	<div class="text-end">

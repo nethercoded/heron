@@ -22,14 +22,14 @@
 				<Icon name="wrench" size={15} />
 			</span>
 			<div class="min-w-0">
-				<h3 class="text-[15px] font-semibold">{w.title}</h3>
+				<h3 class="text-[15px] font-semibold" dir="auto">{w.title}</h3>
 				<p class="mt-0.5 text-xs text-muted">
 					{i18n.dateTime(w.starts_at)} – {sameDay ? i18n.time(w.ends_at) : i18n.dateTime(w.ends_at)}
 					· {i18n.duration(w.duration_s * 1000)}
 					{#if repeatLabel[w.repeat]}· {repeatLabel[w.repeat]}{/if}
 				</p>
 				{#if w.body}
-					<p class="mt-2 leading-relaxed text-muted">{w.body}</p>
+					<p class="mt-2 leading-relaxed text-muted" dir="auto">{w.body}</p>
 				{/if}
 			</div>
 		</div>

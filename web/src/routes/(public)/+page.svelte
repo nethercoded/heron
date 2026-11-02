@@ -86,7 +86,7 @@
 						{i18n.word(overall.tone)}
 					</p>
 					<h1 class="mt-4 text-4xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-5xl">{overall.title}</h1>
-					<p class="mt-3 text-ink/60">{data.page.description || overall.detail}</p>
+					<p class="mt-3 text-ink/60" dir="auto">{data.page.description || overall.detail}</p>
 				</div>
 
 				<dl class="flex flex-wrap items-end gap-x-10 gap-y-5">
@@ -154,9 +154,9 @@
 								<div class="mb-3 flex items-center justify-between gap-4">
 									<div class="flex min-w-0 items-center gap-3">
 										<span class="sq" style="--c: {color[m.status]}; --s: 10px"></span>
-										<span class="truncate font-medium">{m.name}</span>
+										<span class="truncate font-medium" dir="auto">{m.name}</span>
 										{#if m.description}
-											<span class="hidden truncate text-sm text-faint md:inline">{m.description}</span>
+											<span class="hidden truncate text-sm text-faint md:inline" dir="auto">{m.description}</span>
 										{/if}
 									</div>
 									<div class="flex shrink-0 items-center gap-4 font-mono text-xs">
@@ -203,7 +203,7 @@
 									<span class="font-mono text-[11px] tracking-wider text-faint uppercase">{i18n.impact(incident.impact)}</span>
 								</span>
 								{#if incident.updates[0]}
-									<p class="mt-0.5 line-clamp-1 ps-4 text-sm text-muted">{incident.updates[0].body}</p>
+									<p class="mt-0.5 line-clamp-1 ps-4 text-sm text-muted" dir="auto">{incident.updates[0].body}</p>
 								{/if}
 							</a>
 						{:else}
