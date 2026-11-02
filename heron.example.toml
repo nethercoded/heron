@@ -12,3 +12,5 @@ trusted_proxies = ["127.0.0.1", "::1"]
 icmp_privileged = true
 
 check_updates = true
+
+# demo = "demo:look-around"

@@ -148,7 +148,7 @@
 
 {#snippet notice(block: Block)}
 	{@const tone = toneColor[block.tone ?? 'info']}
-	<section class="relative h-full overflow-hidden rounded-card bg-surface px-6 py-5 ps-7">
+	<section class="relative overflow-hidden rounded-card bg-surface px-6 py-5 ps-7">
 		<span class="absolute inset-y-0 start-0 w-1" style="background: {tone}"></span>
 		{#if edit?.selected === block.id}
 			<div class="flex items-center gap-2.5 font-semibold">

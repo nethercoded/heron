@@ -163,7 +163,8 @@ func serve(args []string) error {
 	if err := eng.ReloadMaintenance(ctx); err != nil {
 		return fmt.Errorf("load maintenance windows: %w", err)
 	}
-	sched := scheduler.New(monitor.NewRegistry(userAgent, cfg.ICMPPrivileged), eng, log.With("component", "scheduler"))
+	checkers := monitor.NewRegistry(userAgent, cfg.ICMPPrivileged)
+	sched := scheduler.New(checkers, eng, log.With("component", "scheduler"))
 
 	monitors, err := db.Monitors(ctx)
 	if err != nil {
@@ -210,6 +211,19 @@ func serve(args []string) error {
 	if users == 0 {
 		setupCode = rand.Text()[:12]
 	}
+	demoUser, demoPassword := cfg.DemoLogin()
+	switch {
+	case cfg.Demo == "":
+	case users == 0:
+		log.Warn("the demo account is created once heron is set up, restart after the installer")
+		demoUser, demoPassword = "", ""
+	default:
+		if err := ensureDemo(ctx, db, cfg); err != nil {
+			cancelRun()
+			return fmt.Errorf("demo account: %w", err)
+		}
+		log.Info("demo mode, anyone can look around the admin panel", "user", demoUser)
+	}
 
 	domains := site.New(db, filepath.Join(cfg.DataDir, "certs"), cfg.PublicURL, log.With("component", "site"))
 	domains.OnChange = eng.SetPublicURL
@@ -222,6 +236,9 @@ func serve(args []string) error {
 		TrustedProxies: cfg.Proxies,
 		Assets:         web.Assets(),
 		Updates:        updates,
+		Checker:        checkers,
+		DemoUser:       demoUser,
+		DemoPassword:   demoPassword,
 	})
 	handler := api.Handler()
 	domains.Handler = handler

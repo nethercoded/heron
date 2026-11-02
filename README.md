@@ -20,6 +20,12 @@
   <img src="docs/status.png" width="860" alt="The public status page">
 </p>
 
+```sh
+curl -fsSL https://raw.githubusercontent.com/nethercoded/heron/main/deploy/install.sh | sudo sh
+```
+
+One command on any Linux server, then a web installer takes you the rest of the way. The download is about 10 MB and heron idles at around 40 MB of RAM. Docker works too, see [Getting it running](#getting-it-running).
+
 ## Why heron
 
 I wanted a status page that I could drop on a cheap VPS and forget about. Most tools I tried either needed a database server, ate a few hundred megabytes of RAM, or looked like an admin template from 2014. heron is my answer to that.
@@ -52,15 +58,39 @@ It checks your sites, APIs, databases, containers and game servers, keeps a year
   <img src="docs/monitor.png" width="860" alt="A monitor with its response time chart and uptime calendar">
 </p>
 
+## The page editor
+
+<p align="center">
+  <img src="docs/editor.gif" width="860" alt="Building the status page in the visual editor">
+</p>
+
+**Status page** in the sidebar opens the real public page with your live data. Click a block to choose what it shows, drag it by the handle to move it, pull its edge to make it a third, half or two thirds wide, and use the plus under a block to add a new one. Notices are typed right on the page. Every block can be hidden without losing its settings. Switch between desktop and phone and between the three languages to check how visitors see it. Nothing changes for them until you press **Publish**, and Ctrl+Z undoes any step before that.
+
 ## The admin panel
 
 All monitors on one screen. Filter them by type or group, search by name or address, and drag rows to change the order on the public page.
 
-**Status page, Open the editor** shows the real public page with your live data. Hover a block to see what it is, click it to change it, drag it by the handle to move it, and use the plus between blocks to add a new one. Every block can be hidden without losing its settings. Switch between desktop and phone and between the three languages to check how visitors see it. Nothing changes for them until you press **Publish**, and Ctrl+Z undoes any step before that.
+Adding a monitor takes one field. Paste a website, an address with a port, an IP or a database URL, and heron works out what kind of check it needs. **Check now** tries it before you save. Everything else waits under **More settings** with sensible defaults.
 
 <p align="center">
   <img src="docs/monitors.png" width="860" alt="The list of monitors in the admin panel">
 </p>
+
+## How it compares
+
+There are good tools in this space already. This is where heron sits next to the ones people usually ask about.
+
+| | heron | Uptime Kuma | Gatus | Upptime |
+|---|---|---|---|---|
+| Runs as | One Go binary | Node.js app | One Go binary | GitHub Actions and Pages |
+| Set up through | A web installer | The web UI | A YAML file | A template repository |
+| HTTPS | Built in, Let's Encrypt | Your own proxy | Your own proxy | GitHub Pages |
+| Page layout | Visual editor | Basic page settings | Config file | Config file |
+| People | Owner, admin and viewer roles, audit log | One account | Not needed, it has no admin UI | GitHub access |
+| Alert services | Telegram, Discord, webhooks | 90 and more | Dozens | GitHub issues and a few chat apps |
+| Moving in | Imports from Uptime Kuma | | | |
+
+Pick Uptime Kuma if you need a long list of notification services today. Pick Gatus if you want everything in a config file under version control. Pick Upptime if you do not want to run a server at all. heron is for when you want one small process on your own box, a page that looks good without work, and a panel more than one person can use.
 
 ## Working as a team
 
@@ -180,6 +210,7 @@ Most things are set in the panel. The few that belong to the server live in `her
 | `trusted_proxies` | `HERON_TRUSTED_PROXIES` |          | Proxies allowed to set `X-Forwarded-For`                        |
 | `icmp_privileged` | `HERON_ICMP_PRIVILEGED` | `false`  | Use raw sockets for ping, needs `CAP_NET_RAW`                    |
 | `check_updates`   | `HERON_CHECK_UPDATES`   | `true`   | Look for new releases on GitHub every six hours                 |
+| `demo`            | `HERON_DEMO`            |          | `user:password` of a read-only account shown on the sign in page |
 | `log_level`       | `HERON_LOG_LEVEL`       | `info`   | `debug`, `info`, `warn` or `error`                              |
 | `log_format`      | `HERON_LOG_FORMAT`      | `text`   | `text` or `json`                                                |
 
@@ -285,6 +316,16 @@ sudo systemctl start heron
 ```
 
 `restore` checks that the file really is a heron database from this or an older version, and keeps the database it replaces as `heron.db.before-restore`.
+
+## Running a public demo
+
+Set `demo = "demo:look-around"` and heron creates that account as a viewer on start. The sign in page then offers **Enter the demo**, and the account can open every screen but cannot change anything, not even its own password. `deploy/demo` has a config and a systemd timer that puts a saved database back every hour:
+
+```bash
+sudo heron backup -o /var/lib/heron/seed.db
+sudo cp deploy/demo/heron-demo-reset.* /etc/systemd/system/
+sudo systemctl enable --now heron-demo-reset.timer
+```
 
 ## Moving from Uptime Kuma
 

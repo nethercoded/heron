@@ -1,0 +1,9 @@
+[Unit]
+Description=Put the heron demo back to its starting state
+
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/systemctl stop heron
+ExecStart=/usr/local/bin/heron restore -force -config /etc/heron/heron.toml /var/lib/heron/seed.db
+ExecStartPost=/usr/bin/chown heron:heron /var/lib/heron/heron.db
+ExecStartPost=/usr/bin/systemctl start heron

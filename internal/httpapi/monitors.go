@@ -194,3 +194,27 @@ func slugConflict(err error) error {
 	}
 	return err
 }
+
+func (s *Server) testMonitor(w http.ResponseWriter, r *http.Request) error {
+	var in monitorInput
+	if err := decode(w, r, &in); err != nil {
+		return err
+	}
+	m := &monitor.Monitor{}
+	in.apply(m)
+	if m.Name == "" {
+		m.Name = "test"
+	}
+	m.Normalize()
+	if err := m.Validate(); err != nil {
+		return invalid(err)
+	}
+	if m.Kind == monitor.KindPush {
+		return badRequest("push monitors wait for your job to call them, there is nothing to check yet")
+	}
+	if s.opts.Checker == nil {
+		return errorf(http.StatusServiceUnavailable, "unavailable", "checks are not available")
+	}
+	res := s.opts.Checker.Check(r.Context(), m)
+	return ok(w, map[string]any{"status": res.Status, "latency_ms": res.Latency.Milliseconds(), "message": res.Message})
+}

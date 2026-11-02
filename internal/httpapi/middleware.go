@@ -36,6 +36,10 @@ func (s *Server) requireAdmin(next http.Handler) http.Handler {
 			s.fail(w, r, errorf(http.StatusForbidden, "forbidden", "your role can only view"))
 			return
 		}
+		if s.opts.DemoUser != "" && user.Username == s.opts.DemoUser && !readOnly(r.Method) {
+			s.fail(w, r, errorf(http.StatusForbidden, "demo", "this is a demo, nothing can be changed"))
+			return
+		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userKey{}, user)))
 	})
 }

@@ -301,6 +301,7 @@ export interface AuthState {
 	setup_required: boolean;
 	user: User | null;
 	version: string;
+	demo?: { username: string; password: string };
 }
 
 export interface LiveMonitor {

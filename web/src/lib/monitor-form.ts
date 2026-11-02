@@ -131,3 +131,94 @@ export function parseCodes(text: string) {
 		.map(Number)
 		.filter((n) => Number.isInteger(n) && n > 0);
 }
+
+export const commonKinds: { value: Kind; label: string }[] = [
+	{ value: 'http', label: 'Website or API' },
+	{ value: 'tcp', label: 'Open port' },
+	{ value: 'icmp', label: 'Ping' },
+	{ value: 'push', label: 'Cron job heartbeat' }
+];
+
+export const otherKinds: { value: Kind; label: string }[] = [
+	{ value: 'dns', label: 'DNS record' },
+	{ value: 'postgres', label: 'Postgres' },
+	{ value: 'redis', label: 'Redis' },
+	{ value: 'smtp', label: 'Mail server (SMTP)' },
+	{ value: 'imap', label: 'Mailbox (IMAP)' },
+	{ value: 'docker', label: 'Docker container' },
+	{ value: 'grpc', label: 'gRPC service' },
+	{ value: 'minecraft', label: 'Minecraft server' },
+	{ value: 'steam', label: 'Steam game server' }
+];
+
+export const kindLabel = (kind: Kind) => [...commonKinds, ...otherKinds].find((k) => k.value === kind)?.label ?? kind;
+
+const schemes: Record<string, Kind> = {
+	http: 'http',
+	https: 'http',
+	postgres: 'postgres',
+	postgresql: 'postgres',
+	redis: 'redis',
+	rediss: 'redis',
+	grpc: 'grpc'
+};
+
+const ports: Record<string, Kind> = {
+	'80': 'http',
+	'443': 'http',
+	'3000': 'http',
+	'5000': 'http',
+	'8000': 'http',
+	'8080': 'http',
+	'8443': 'http',
+	'6379': 'redis',
+	'25': 'smtp',
+	'465': 'smtp',
+	'587': 'smtp',
+	'143': 'imap',
+	'993': 'imap',
+	'25565': 'minecraft',
+	'27015': 'steam',
+	'50051': 'grpc'
+};
+
+export function detect(raw: string): Kind | null {
+	const value = raw.trim();
+	if (!value) return null;
+	const scheme = value.match(/^([a-z]+):\/\//i)?.[1]?.toLowerCase();
+	if (scheme) return schemes[scheme] ?? 'http';
+	const port = value.match(/^[^/\s]+:(\d+)$/)?.[1];
+	if (port) return ports[port] ?? 'tcp';
+	if (/^localhost(\/.*)?$/i.test(value)) return 'http';
+	if (/^[\d.]+$/.test(value) || /^[0-9a-f]*:[0-9a-f:]+$/i.test(value)) return 'icmp';
+	if (/^[^\s/]+\.[^\s/.]+(\/.*)?$/.test(value)) return 'http';
+	return null;
+}
+
+export function normalizeTarget(kind: Kind, raw: string) {
+	const value = raw.trim();
+	if (kind === 'http' && value && !/^https?:\/\//i.test(value)) {
+		const port = value.match(/^[^/]+:(\d+)/)?.[1];
+		const local = /^(localhost|127\.|10\.|192\.168\.)/.test(value);
+		return `${(port && port !== '443') || local ? 'http' : 'https'}://${value}`;
+	}
+	if (kind === 'grpc') return value.replace(/^grpc:\/\//i, '');
+	if (kind === 'redis' && /^rediss?:\/\//i.test(value)) {
+		try {
+			return new URL(value).host;
+		} catch {
+			return value;
+		}
+	}
+	return value;
+}
+
+export function nameFrom(kind: Kind, raw: string) {
+	const value = raw.trim();
+	if (!value) return '';
+	try {
+		if (/^[a-z]+:\/\//i.test(value)) return new URL(value).hostname.replace(/^www\./, '');
+		if (kind === 'http') return new URL(`https://${value}`).hostname.replace(/^www\./, '');
+	} catch {}
+	return value.replace(/:\d+$/, '');
+}

@@ -16,6 +16,12 @@ type authStateDTO struct {
 	SetupRequired bool     `json:"setup_required"`
 	User          *userDTO `json:"user"`
 	Version       string   `json:"version"`
+	Demo          *demoDTO `json:"demo,omitzero"`
+}
+
+type demoDTO struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 func (s *Server) authState(w http.ResponseWriter, r *http.Request) error {
@@ -25,6 +31,9 @@ func (s *Server) authState(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	state := authStateDTO{SetupRequired: n == 0, Version: s.opts.Version}
+	if s.opts.DemoUser != "" {
+		state.Demo = &demoDTO{Username: s.opts.DemoUser, Password: s.opts.DemoPassword}
+	}
 	if u, err := s.sessions.User(ctx, w, r); err == nil {
 		state.User = toUser(u)
 	}

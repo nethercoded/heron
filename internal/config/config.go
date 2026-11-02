@@ -26,6 +26,7 @@ type Config struct {
 	TrustedProxies []string `toml:"trusted_proxies"`
 	ICMPPrivileged bool     `toml:"icmp_privileged"`
 	CheckUpdates   bool     `toml:"check_updates"`
+	Demo           string   `toml:"demo"`
 
 	Location *time.Location `toml:"-"`
 	Proxies  []netip.Prefix `toml:"-"`
@@ -67,6 +68,7 @@ func (c *Config) applyEnv(lookup func(string) (string, bool)) error {
 		"HERON_LOG_LEVEL":  &c.LogLevel,
 		"HERON_LOG_FORMAT": &c.LogFormat,
 		"HERON_TIMEZONE":   &c.Timezone,
+		"HERON_DEMO":       &c.Demo,
 	}
 	for key, dst := range text {
 		if v, ok := lookup(key); ok {
@@ -108,6 +110,12 @@ func (c *Config) resolve() error {
 		errs = append(errs, fmt.Errorf("timezone: %w", err))
 	}
 	c.Location = loc
+
+	if c.Demo != "" {
+		if user, pass, ok := strings.Cut(c.Demo, ":"); !ok || user == "" || pass == "" {
+			errs = append(errs, errors.New("demo: use user:password"))
+		}
+	}
 
 	if c.RetentionDays < 1 {
 		errs = append(errs, errors.New("retention_days must be at least 1"))
@@ -169,4 +177,9 @@ func parsePrefix(s string) (netip.Prefix, error) {
 		return netip.Prefix{}, err
 	}
 	return netip.PrefixFrom(addr, addr.BitLen()), nil
+}
+
+func (c Config) DemoLogin() (string, string) {
+	user, pass, _ := strings.Cut(c.Demo, ":")
+	return user, pass
 }

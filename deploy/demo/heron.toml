@@ -1,0 +1,4 @@
+listen = ":8080"
+data_dir = "/var/lib/heron"
+demo = "demo:look-around"
+check_updates = false

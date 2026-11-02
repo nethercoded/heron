@@ -36,6 +36,9 @@ type Options struct {
 	TrustedProxies []netip.Prefix
 	Assets         fs.FS
 	Updates        *update.Service
+	Checker        monitor.Checker
+	DemoUser       string
+	DemoPassword   string
 }
 
 type Server struct {
@@ -121,6 +124,7 @@ func (s *Server) Handler() http.Handler {
 
 	admin.Handle("GET /api/admin/monitors", s.handle(s.listMonitors))
 	admin.Handle("POST /api/admin/monitors", do("monitor.create", s.createMonitor))
+	admin.Handle("POST /api/admin/monitors/test", s.handle(s.testMonitor))
 	admin.Handle("PUT /api/admin/monitors/order", do("monitor.reorder", s.reorderMonitors))
 	admin.Handle("GET /api/admin/monitors/{id}", s.handle(s.getMonitor))
 	admin.Handle("GET /api/admin/monitors/{id}/series", s.handle(s.adminSeries))

@@ -6,8 +6,11 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/nethercoded/heron/internal/auth"
+	"github.com/nethercoded/heron/internal/monitor"
 	"github.com/nethercoded/heron/internal/store"
 )
 
@@ -115,4 +118,43 @@ func TestPageBlocks(t *testing.T) {
 	if bad.Fields["blocks.2.id"] == "" || bad.Fields["blocks.2.type"] == "" {
 		t.Fatalf("fields = %v", bad.Fields)
 	}
+}
+
+func TestMonitorTest(t *testing.T) {
+	site := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	t.Cleanup(site.Close)
+	h := newHarness(t, func(o *Options) { o.Checker = monitor.NewRegistry("heron-test", false) })
+	h.signIn()
+
+	var res struct {
+		Status  string `json:"status"`
+		Message string `json:"message"`
+	}
+	h.expect("POST", "/api/admin/monitors/test", map[string]any{"kind": "http", "target": site.URL, "interval_s": 60, "timeout_s": 5}, http.StatusOK, &res)
+	if res.Status != "up" {
+		t.Fatalf("result = %+v", res)
+	}
+	h.expect("POST", "/api/admin/monitors/test", map[string]any{"kind": "http", "target": "nope", "interval_s": 60, "timeout_s": 5}, http.StatusUnprocessableEntity, nil)
+	h.expect("POST", "/api/admin/monitors/test", map[string]any{"kind": "push", "interval_s": 60}, http.StatusBadRequest, nil)
+	if list, _ := h.store.Monitors(t.Context()); len(list) != 0 {
+		t.Fatal("a test check saved a monitor")
+	}
+}
+
+func TestDemoAccount(t *testing.T) {
+	h := newHarness(t, func(o *Options) { o.DemoUser, o.DemoPassword = "demo", "look around freely" })
+	h.signIn()
+	hash, _ := auth.Hash("look around freely")
+	h.store.CreateUser(t.Context(), "demo", hash, store.RoleViewer)
+
+	var state authStateDTO
+	h.expect("GET", "/api/auth/state", nil, http.StatusOK, &state)
+	if state.Demo == nil || state.Demo.Username != "demo" {
+		t.Fatalf("state = %+v", state)
+	}
+
+	demo := h.guest()
+	demo.expect("POST", "/api/auth/login", credentials{Username: "demo", Password: "look around freely"}, http.StatusOK, nil)
+	demo.expect("GET", "/api/admin/monitors", nil, http.StatusOK, nil)
+	demo.expect("PUT", "/api/admin/account/password", map[string]string{"current": "look around freely", "next": "a brand new secret"}, http.StatusForbidden, nil)
 }

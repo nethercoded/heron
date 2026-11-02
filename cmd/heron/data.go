@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/nethercoded/heron/internal/auth"
 	"github.com/nethercoded/heron/internal/config"
 	"github.com/nethercoded/heron/internal/kuma"
 	"github.com/nethercoded/heron/internal/store"
@@ -159,4 +160,27 @@ func size(n int64) string {
 		return fmt.Sprintf("%.1f KB", float64(n)/(1<<10))
 	}
 	return fmt.Sprintf("%d B", n)
+}
+
+func ensureDemo(ctx context.Context, db *store.Store, cfg config.Config) error {
+	name, password := cfg.DemoLogin()
+	hash, err := auth.Hash(password)
+	if err != nil {
+		return err
+	}
+	u, err := db.UserByName(ctx, name)
+	if errors.Is(err, store.ErrNotFound) {
+		_, err = db.CreateUser(ctx, name, hash, store.RoleViewer)
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	if u.Role == store.RoleOwner {
+		return fmt.Errorf("demo user %q is the owner, pick another name", name)
+	}
+	if err := db.SetPassword(ctx, u.ID, hash); err != nil {
+		return err
+	}
+	return db.SetRole(ctx, u.ID, store.RoleViewer)
 }

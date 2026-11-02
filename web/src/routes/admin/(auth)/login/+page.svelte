@@ -4,6 +4,7 @@
 	import { passkeyCancelled, passkeysSupported, signInWithPasskey } from '#lib/passkey.ts';
 	import type { LoginResult } from '#lib/types.ts';
 	import { goto, invalidate } from '$app/navigation';
+	import { page } from '$app/state';
 
 	let username = $state('');
 	let password = $state('');
@@ -14,6 +15,16 @@
 	let codeInput = $state<HTMLInputElement>();
 
 	const canPasskey = passkeysSupported();
+	const demo = $derived(page.data.auth?.demo);
+
+	let form = $state<HTMLFormElement>();
+
+	function tryDemo() {
+		if (!demo) return;
+		username = demo.username;
+		password = demo.password;
+		queueMicrotask(() => form?.requestSubmit());
+	}
 
 	async function enter() {
 		await invalidate('heron:auth');
@@ -119,11 +130,22 @@
 		<button type="button" class="w-full text-center text-[13px] font-medium text-muted hover:text-ink" onclick={back}>Use another account</button>
 	</form>
 {:else}
-	<form class="on-sheet space-y-5" onsubmit={submit}>
+	<form class="on-sheet space-y-5" onsubmit={submit} bind:this={form}>
 		<div>
 			<h1 class="text-[40px] leading-none font-semibold tracking-[-0.035em]">Sign in</h1>
 			<p class="mt-3 text-ink-2">Manage monitors, incidents and alerts.</p>
 		</div>
+
+		{#if demo}
+			<div class="rounded-ctl border border-line-strong p-4">
+				<p class="text-[14px] font-semibold">This is a live demo</p>
+				<p class="mt-1 text-[13px] text-muted">
+					Look around as <span class="font-mono text-ink-2">{demo.username}</span>. You can see everything, change nothing, and the data
+					resets every hour.
+				</p>
+				<button type="button" class="btn-primary mt-3 h-10 w-full" disabled={busy} onclick={tryDemo}>Enter the demo</button>
+			</div>
+		{/if}
 
 		<div>
 			<label for="username" class="label">Username</label>
