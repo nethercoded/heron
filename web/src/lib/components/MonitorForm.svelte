@@ -92,7 +92,7 @@
 						{#each group.kinds as k (k.value)}
 							<label
 								class="cursor-pointer rounded-lg border px-3 py-2.5 transition {form.kind === k.value
-									? 'border-accent bg-accent/5 ring-1 ring-accent'
+									? 'border-ink bg-surface'
 									: 'border-line hover:border-line-strong'}"
 							>
 								<input type="radio" name="kind" value={k.value} bind:group={form.kind} class="sr-only" />

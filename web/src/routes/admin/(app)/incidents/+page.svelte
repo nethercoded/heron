@@ -19,10 +19,10 @@
 	{/snippet}
 </PageHeader>
 
-<div class="mb-4 inline-flex rounded-lg bg-sunken p-0.5">
+<div class="mb-4 inline-flex rounded-full bg-surface p-1">
 	{#each [['open', `Open · ${open.length}`], ['resolved', `Resolved · ${resolved.length}`]] as [value, label] (value)}
 		<button
-			class="rounded-md px-3 py-1.5 text-sm font-medium transition {tab === value ? 'bg-surface text-ink shadow-card' : 'text-muted hover:text-ink'}"
+			class="rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors {tab === value ? 'bg-ink text-canvas' : 'text-muted hover:text-ink'}"
 			onclick={() => (tab = value as typeof tab)}
 		>
 			{label}

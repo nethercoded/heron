@@ -28,10 +28,10 @@
 	<title>Sign in · heron</title>
 </svelte:head>
 
-<form class="card space-y-4 p-6" onsubmit={submit}>
+<form class="on-sheet space-y-5" onsubmit={submit}>
 	<div>
-		<h1 class="text-lg font-semibold">Sign in</h1>
-		<p class="text-sm text-muted">Manage monitors, incidents and alerts.</p>
+		<h1 class="text-[40px] leading-none font-semibold tracking-[-0.035em]">Sign in</h1>
+		<p class="mt-3 text-ink-2">Manage monitors, incidents and alerts.</p>
 	</div>
 
 	<div>
@@ -44,8 +44,8 @@
 	</div>
 
 	{#if error}
-		<p class="rounded-lg bg-down/10 px-3 py-2 text-sm text-down">{error}</p>
+		<p class="flex items-center gap-2 text-[13px] font-semibold text-down"><i class="size-1.5 rounded-[1px] bg-down"></i>{error}</p>
 	{/if}
 
-	<button class="btn-primary w-full" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+	<button class="btn-primary h-[46px] w-full text-[15px]" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
 </form>

@@ -36,10 +36,10 @@
 	<title>Welcome · heron</title>
 </svelte:head>
 
-<form class="card space-y-4 p-6" onsubmit={submit}>
+<form class="on-sheet space-y-5" onsubmit={submit}>
 	<div>
-		<h1 class="text-lg font-semibold">Welcome to heron</h1>
-		<p class="text-sm text-muted">Create the administrator account to get started.</p>
+		<h1 class="text-[40px] leading-none font-semibold tracking-[-0.035em]">Welcome to heron</h1>
+		<p class="mt-3 text-ink-2">Create the administrator account to get started.</p>
 	</div>
 
 	<Field label="Username" id="username" error={fields.username}>
@@ -53,8 +53,8 @@
 	</Field>
 
 	{#if error && Object.keys(fields).length === 0}
-		<p class="rounded-lg bg-down/10 px-3 py-2 text-sm text-down">{error}</p>
+		<p class="flex items-center gap-2 text-[13px] font-semibold text-down"><i class="size-1.5 rounded-[1px] bg-down"></i>{error}</p>
 	{/if}
 
-	<button class="btn-primary w-full" disabled={busy}>{busy ? 'Creating…' : 'Create account'}</button>
+	<button class="btn-primary h-[46px] w-full text-[15px]" disabled={busy}>{busy ? 'Creating…' : 'Create account'}</button>
 </form>

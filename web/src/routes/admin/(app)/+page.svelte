@@ -65,120 +65,133 @@
 		true
 	);
 
-	const kpis: { status: Status; label: string; tone: string }[] = [
-		{ status: 'up', label: 'Operational', tone: 'text-up' },
-		{ status: 'degraded', label: 'Degraded', tone: 'text-degraded' },
-		{ status: 'down', label: 'Down', tone: 'text-down' },
-		{ status: 'paused', label: 'Paused', tone: 'text-muted' }
+	const kpis: { status: Status; label: string; color: string }[] = [
+		{ status: 'up', label: 'Operational', color: 'var(--color-up)' },
+		{ status: 'degraded', label: 'Degraded', color: 'var(--color-degraded)' },
+		{ status: 'down', label: 'Down', color: 'var(--color-down)' },
+		{ status: 'paused', label: 'Paused', color: 'var(--color-paused)' }
 	];
 
 	const uptimeTone = (u: number | undefined) =>
 		u == null ? 'bg-pending' : u >= 0.999 ? 'bg-up' : u >= 0.98 ? 'bg-degraded' : 'bg-down';
 </script>
 
-<PageHeader title="Monitors" description="Health checks running against your infrastructure.">
+<PageHeader title="Monitors">
+	{#snippet meta()}
+		<span class="flex items-center gap-2"><span class="sq" style="--c: var(--color-up); --s: 8px"></span>{counts.up} operational</span>
+		{#if counts.down > 0}
+			<span class="flex items-center gap-2 text-down"><span class="sq blink" style="--c: var(--color-down); --s: 8px"></span>{counts.down} down</span>
+		{/if}
+		<span class="text-faint">{percent(fleetUptime)} uptime in 24h</span>
+	{/snippet}
 	{#snippet actions()}
-		<a href="/admin/monitors/new" class="btn-primary"><Icon name="plus" size={14} /> New monitor</a>
+		<a href="/admin/monitors/new" class="btn-primary"><Icon name="plus" /> New monitor</a>
 	{/snippet}
 </PageHeader>
 
-<section class="card mb-6 grid grid-cols-2 divide-line sm:grid-cols-3 lg:grid-cols-6 lg:divide-x">
-	<div class="px-5 py-4">
-		<p class="eyebrow">Total</p>
-		<p class="mt-1.5 text-2xl font-semibold tabular-nums">{monitors.length}</p>
+<section class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+	<div class="rounded-card bg-surface px-5 py-4">
+		<p class="text-[13px] font-medium text-ink-2">Total</p>
+		<p class="mt-3 text-[34px] leading-none font-semibold tracking-tight">{monitors.length}</p>
 	</div>
 	{#each kpis as k (k.status)}
 		<button
 			type="button"
-			class="px-5 py-4 text-left transition hover:bg-sunken/70 {filter === k.status ? 'bg-sunken' : ''}"
+			class="rounded-card px-5 py-4 text-left transition-colors {filter === k.status ? 'bg-ink text-canvas' : 'bg-surface hover:bg-sunken'}"
 			onclick={() => (filter = filter === k.status ? 'all' : k.status)}
 			aria-pressed={filter === k.status}
 		>
-			<p class="eyebrow">{k.label}</p>
-			<p class="mt-1.5 text-2xl font-semibold tabular-nums {counts[k.status] > 0 ? k.tone : 'text-faint'}">{counts[k.status]}</p>
+			<p class="flex items-center gap-2 text-[13px] font-medium {filter === k.status ? 'text-canvas/70' : 'text-ink-2'}">
+				<span class="sq" style="--c: {k.color}; --s: 8px"></span>
+				{k.label}
+			</p>
+			<p class="mt-3 text-[34px] leading-none font-semibold tracking-tight {counts[k.status] > 0 || filter === k.status ? '' : 'text-faint'}">
+				{counts[k.status]}
+			</p>
 		</button>
 	{/each}
-	<div class="px-5 py-4">
-		<p class="eyebrow">Uptime · 24h</p>
-		<p class="mt-1.5 text-2xl font-semibold tabular-nums">{percent(fleetUptime)}</p>
-	</div>
 </section>
 
 {#if monitors.length === 0}
 	<div class="card flex flex-col items-center px-6 py-16 text-center">
-		<span class="grid size-12 place-items-center rounded-full bg-sunken text-muted"><Icon name="activity" size={22} /></span>
-		<h2 class="mt-4 text-[15px] font-semibold">No monitors configured</h2>
-		<p class="mt-1 max-w-sm text-muted">Add a website, API, server or scheduled job and heron will start checking it immediately.</p>
-		<a href="/admin/monitors/new" class="btn-primary mt-6"><Icon name="plus" size={14} /> Create monitor</a>
+		<span class="grid size-10 place-items-center rounded-ctl bg-sunken text-ink-2"><Icon name="activity" size={18} /></span>
+		<p class="mt-4 text-[17px] font-semibold">No monitors yet</p>
+		<p class="mt-1 max-w-sm text-ink-2">Add a website, API, database, container or game server and heron starts checking it right away.</p>
+		<a href="/admin/monitors/new" class="btn-primary mt-6"><Icon name="plus" /> Create monitor</a>
 	</div>
 {:else}
-	<div class="card overflow-hidden">
-		<div class="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
-			<div class="relative w-full max-w-xs">
-				<input class="input pl-8" type="search" placeholder="Filter by name, target or group" bind:value={query} />
-				<span class="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-faint"><Icon name="search" size={13} /></span>
+	<section class="card overflow-hidden">
+		<header class="flex flex-wrap items-center gap-3 px-[22px] pt-[18px] pb-4">
+			<h2 class="text-[22px] leading-tight font-semibold tracking-[-0.015em]">All monitors</h2>
+			<span class="text-[15px] font-medium text-faint">{visible.length}</span>
+			<div class="ml-auto flex w-full items-center gap-2 sm:w-auto">
+				{#if filter !== 'all'}
+					<button class="btn-secondary btn-sm" onclick={() => (filter = 'all')}>
+						{statusLabel[filter]} <Icon name="x" size={11} />
+					</button>
+				{/if}
+				<div class="relative w-full sm:w-72">
+					<input class="input h-10 pl-10" type="search" placeholder="Search" bind:value={query} />
+					<span class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-faint"><Icon name="search" size={15} /></span>
+				</div>
 			</div>
-			{#if filter !== 'all'}
-				<button class="btn-secondary btn-sm" onclick={() => (filter = 'all')}>
-					Status: {statusLabel[filter]} <Icon name="x" size={11} />
-				</button>
-			{/if}
-			<span class="ml-auto text-xs text-muted">{visible.length} of {monitors.length}</span>
-		</div>
+		</header>
 
 		<div class="overflow-x-auto">
 			<table class="w-full">
-				<thead class="border-b border-line bg-sunken/70">
+				<thead class="border-y border-line">
 					<tr>
-						<th class="th w-32">Status</th>
-						<th class="th">Monitor</th>
+						<th class="th pl-[22px]">Monitor</th>
+						<th class="th w-36">Status</th>
 						<th class="th hidden md:table-cell">Type</th>
 						<th class="th hidden xl:table-cell">Group</th>
-						<th class="th w-40">Uptime 24h</th>
+						<th class="th w-44">Uptime 24h</th>
 						<th class="th hidden text-right sm:table-cell">Response</th>
-						<th class="th hidden text-right lg:table-cell">Last check</th>
+						<th class="th hidden pr-[22px] text-right lg:table-cell">Checked</th>
 					</tr>
 				</thead>
 				<tbody class="divide-y divide-line">
 					{#each visible as m (m.id)}
-						<tr class="relative transition hover:bg-sunken/60">
-							<td class="px-4 py-3"><StatusBadge status={m.status} /></td>
-							<td class="min-w-64 px-4 py-3">
+						<tr class="relative transition-colors hover:bg-surface">
+							<td class="min-w-64 py-3.5 pr-4 pl-[22px]">
 								<a href="/admin/monitors/{m.id}" class="block after:absolute after:inset-0">
-									<span class="flex items-center gap-2 font-medium">
+									<span class="flex items-center gap-2 text-[15px] font-semibold">
 										<span class="truncate">{m.name}</span>
 										{#if !m.public}
-											<span class="chip text-faint ring-line-strong">Private</span>
+											<span class="chip text-faint ring-line-strong">private</span>
 										{/if}
 									</span>
-									<span class="block max-w-[22rem] truncate font-mono text-xs text-muted">
-										{m.kind === 'push' ? `heartbeat · every ${interval(m.interval_s)}` : displayTarget(m.target)}
+									<span class="mt-0.5 block max-w-[24rem] truncate font-mono text-xs text-faint">
+										{m.kind === 'push' ? `heartbeat every ${interval(m.interval_s)}` : displayTarget(m.target)}
 									</span>
 								</a>
 							</td>
-							<td class="hidden px-4 py-3 whitespace-nowrap md:table-cell">
-								<span class="rounded border border-line px-1.5 py-0.5 font-mono text-[11px] text-muted">{kindLabel[m.kind]}</span>
-								<span class="ml-1.5 text-xs text-faint">{interval(m.interval_s)}</span>
+							<td class="px-4 py-3.5"><StatusBadge status={m.status} /></td>
+							<td class="hidden px-4 py-3.5 whitespace-nowrap md:table-cell">
+								<span class="text-[14px] text-ink-2">{kindLabel[m.kind]}</span>
+								<span class="ml-1.5 font-mono text-xs text-faint">{interval(m.interval_s)}</span>
 							</td>
-							<td class="hidden px-4 py-3 text-muted xl:table-cell">{m.group || '—'}</td>
-							<td class="px-4 py-3">
-								<div class="flex items-center gap-2.5">
-									<span class="h-1.5 w-16 overflow-hidden rounded-full bg-sunken">
-										<span class="block h-full {uptimeTone(m.uptime_24h)}" style="width: {(m.uptime_24h ?? 0) * 100}%"></span>
+							<td class="hidden px-4 py-3.5 text-ink-2 xl:table-cell">{m.group || '—'}</td>
+							<td class="px-4 py-3.5">
+								<div class="flex items-center gap-3">
+									<span class="flex h-2.5 w-20 gap-[2px]">
+										{#each Array(10) as _, i (i)}
+											<span class="flex-1 rounded-[1px] {i < Math.round((m.uptime_24h ?? 0) * 10) ? uptimeTone(m.uptime_24h) : 'bg-pending'}"></span>
+										{/each}
 									</span>
-									<span class="text-xs font-medium tabular-nums">{percent(m.uptime_24h)}</span>
+									<span class="font-mono text-xs">{percent(m.uptime_24h)}</span>
 								</div>
 							</td>
-							<td class="hidden px-4 py-3 text-right font-mono text-xs text-muted sm:table-cell">
+							<td class="hidden px-4 py-3.5 text-right font-mono text-xs text-ink-2 sm:table-cell">
 								{m.status === 'down' || m.status === 'paused' ? '—' : latency(m.latency_ms)}
 							</td>
-							<td class="hidden px-4 py-3 text-right text-xs whitespace-nowrap text-muted lg:table-cell">{ago(m.checked_at, clock.now)}</td>
+							<td class="hidden py-3.5 pr-[22px] pl-4 text-right text-[13px] whitespace-nowrap text-faint lg:table-cell">{ago(m.checked_at, clock.now)}</td>
 						</tr>
 					{:else}
-						<tr><td colspan="7" class="px-4 py-10 text-center text-muted">No monitors match the current filter.</td></tr>
+						<tr><td colspan="7" class="px-4 py-12 text-center text-ink-2">Nothing matches the filter.</td></tr>
 					{/each}
 				</tbody>
 			</table>
 		</div>
-	</div>
+	</section>
 {/if}

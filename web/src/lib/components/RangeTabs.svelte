@@ -6,13 +6,13 @@
 	const ranges: Range[] = ['24h', '7d', '30d', '90d'];
 </script>
 
-<div class="inline-flex rounded-lg bg-sunken p-0.5" role="tablist">
+<div class="inline-flex rounded-full bg-surface p-1" role="tablist">
 	{#each ranges as range (range)}
 		<button
 			type="button"
 			role="tab"
 			aria-selected={value === range}
-			class="rounded-md px-2.5 py-1 text-xs font-medium transition {value === range ? 'bg-surface text-ink shadow-card' : 'text-muted hover:text-ink'}"
+			class="rounded-full px-3 py-1 font-mono text-xs font-medium transition-colors {value === range ? 'bg-ink text-canvas' : 'text-muted hover:text-ink'}"
 			onclick={() => (value = range)}
 		>
 			{range}

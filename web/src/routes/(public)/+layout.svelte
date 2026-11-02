@@ -61,17 +61,10 @@
 			transition.finished.finally(() => delete document.documentElement.dataset.slide);
 		});
 	});
-
-	$effect(() => {
-		const root = document.documentElement;
-		root.classList.add('public');
-		return () => root.classList.remove('public');
-	});
 </script>
 
 <svelte:head>
 	<title>{info.title}</title>
-	<meta name="theme-color" content="#000000" />
 	{#if info.description}
 		<meta name="description" content={info.description} />
 	{/if}
