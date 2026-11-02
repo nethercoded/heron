@@ -5,7 +5,7 @@
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import Toggle from '#lib/components/Toggle.svelte';
 	import { toast } from '#lib/toast.svelte.ts';
-	import type { Channel } from '#lib/types.ts';
+	import type { Channel, ChannelKind } from '#lib/types.ts';
 	import { invalidate } from '$app/navigation';
 	import type { PageProps } from './$types';
 
@@ -16,6 +16,12 @@
 	let testing = $state<number | null>(null);
 
 	const reload = () => invalidate('heron:channels');
+
+	const kinds: Record<ChannelKind, { label: string; icon: 'send' | 'message' | 'link' }> = {
+		telegram: { label: 'Telegram', icon: 'send' },
+		discord: { label: 'Discord', icon: 'message' },
+		webhook: { label: 'Webhook', icon: 'link' }
+	};
 
 	async function create(input: Omit<Channel, 'id' | 'created_at' | 'updated_at'>) {
 		await api.post('/admin/channels', input);
@@ -70,6 +76,7 @@
 
 	function summary(channel: Channel) {
 		if (channel.kind === 'telegram') return `Chat ${channel.config.chat_id}`;
+		if (channel.kind === 'discord') return channel.config.mention ? `Pings ${channel.config.mention}` : 'Webhook';
 		try {
 			return new URL(channel.config.url ?? '').host;
 		} catch {
@@ -102,12 +109,12 @@
 				<div class="flex flex-wrap items-center justify-between gap-4">
 					<div class="flex min-w-0 items-center gap-3">
 						<span class="grid size-10 place-items-center rounded-lg bg-sunken text-muted">
-							<Icon name={channel.kind === 'telegram' ? 'send' : 'link'} />
+							<Icon name={kinds[channel.kind].icon} />
 						</span>
 						<div class="min-w-0">
 							<p class="font-medium">{channel.name}</p>
 							<p class="truncate text-xs text-muted">
-								{channel.kind === 'telegram' ? 'Telegram' : 'Webhook'} · {summary(channel)}
+								{kinds[channel.kind].label} · {summary(channel)}
 							</p>
 						</div>
 					</div>
@@ -128,7 +135,7 @@
 			<div class="card flex flex-col items-center px-6 py-14 text-center">
 				<span class="grid size-12 place-items-center rounded-full bg-sunken text-muted"><Icon name="bell" size={22} /></span>
 				<h2 class="mt-4 font-semibold">No channels yet</h2>
-				<p class="mt-1 max-w-sm text-sm text-muted">Connect a Telegram chat or any webhook, then pick it on the monitors you care about.</p>
+				<p class="mt-1 max-w-sm text-sm text-muted">Connect a Telegram chat, a Discord channel or any webhook, then pick it on the monitors you care about.</p>
 				<button class="btn-primary mt-6" onclick={() => (adding = true)}><Icon name="plus" /> Add channel</button>
 			</div>
 		{/if}

@@ -4,6 +4,7 @@
 	import LocaleSwitch from '#lib/components/LocaleSwitch.svelte';
 	import Logo from '#lib/components/Logo.svelte';
 	import { provideI18n } from '#lib/i18n.svelte.ts';
+	import { inPreview, Preview, setPreview } from '#lib/preview.svelte.ts';
 	import { StatusStore, setStatus } from '#lib/status-page.svelte.ts';
 	import { onNavigate } from '$app/navigation';
 	import { page } from '$app/state';
@@ -14,6 +15,15 @@
 	const store = new StatusStore(untrack(() => data.status));
 	setStatus(store);
 	const i18n = provideI18n();
+	const preview = inPreview(page.url) ? setPreview(new Preview()) : null;
+
+	$effect.pre(() => {
+		if (!preview) return;
+		store.draft = preview.page;
+		if (preview.locale) i18n.locale = preview.locale;
+	});
+
+	const picked = (id: string) => (preview?.selected === id ? true : undefined);
 
 	const info = $derived(store.page);
 	const nav = $derived([
@@ -84,9 +94,9 @@
 	{/if}
 </svelte:head>
 
-<div class="flex min-h-dvh flex-col bg-canvas">
+<div class="flex min-h-dvh flex-col bg-canvas {preview ? 'studio' : ''}" onclickcapture={(e) => preview?.click(e)} role="presentation">
 	<header class="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 pt-6 sm:gap-4 pb-2 sm:px-6">
-		<a href={info.home_url || '/'} class="flex min-w-0 items-center gap-3">
+		<a href={info.home_url || '/'} class="flex min-w-0 items-center gap-3" data-edit={preview ? '@brand' : undefined} data-selected={picked('@brand')}>
 			{#if info.logo_url}
 				<img src={info.logo_url} alt="" class="h-8 w-auto max-w-40 object-contain" />
 			{:else}
@@ -131,7 +141,7 @@
 	</main>
 
 	<footer class="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-3 px-4 py-8 text-xs text-faint sm:flex-row sm:px-6">
-		<span>{info.footer || `© ${new Date().getFullYear()} ${info.title}`}</span>
+		<span data-edit={preview ? '@footer' : undefined} data-selected={picked('@footer')}>{info.footer || `© ${new Date().getFullYear()} ${info.title}`}</span>
 		<a href="https://github.com/nethercoded/heron" class="flex items-center gap-2 hover:text-muted" rel="noopener" target="_blank">
 			<Logo size={14} /> heron <Icon name="external" size={11} />
 		</a>

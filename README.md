@@ -30,11 +30,11 @@ It checks your sites, APIs, databases, containers and game servers, keeps a year
 
 **Checks.** HTTP and HTTPS with status codes, keywords, custom headers and certificate expiry. TCP ports, ping and DNS records. Postgres (it runs a real query), Redis, SMTP with STARTTLS, IMAP, Docker containers and their healthchecks, gRPC health, Minecraft and Steam servers with player counts. Push monitors for cron jobs and backups that call heron instead of the other way around.
 
-**Status page.** 90 day uptime bars, a GitHub style calendar for the whole year, response time charts and an incident timeline. Live updates over Server-Sent Events, no refresh needed.
+**Status page.** 90 day uptime bars, a GitHub style calendar for the whole year, response time charts and an incident timeline. Live updates over Server-Sent Events, no refresh needed. Lay it out in a visual editor: drag blocks around, click one to choose what it shows, add notices of your own and preview it on a phone before you publish.
 
 **Incidents and maintenance.** Incidents open and resolve on their own, and you can write updates by hand. Maintenance windows can be one-off or repeat every day or week. While one is running, alerts stay quiet and the page tells visitors what is going on.
 
-**Alerts.** Telegram (topics in forum groups work too) and signed webhooks, with retries. A monitor only counts as down after the number of failed checks you choose, so a single hiccup does not wake you up.
+**Alerts.** Telegram (topics in forum groups work too), Discord with an optional role ping, and signed webhooks, with retries. A monitor only counts as down after the number of failed checks you choose, so a single hiccup does not wake you up.
 
 **Team.** Invite people with a one-time link and give them a role. Owners manage people and the domain, admins run monitors and incidents, viewers can look around but not touch anything. An audit log keeps a year of who changed what.
 
@@ -42,7 +42,9 @@ It checks your sites, APIs, databases, containers and game servers, keeps a year
 
 **Three languages.** The public page speaks English, Russian and Hebrew, with proper right-to-left layout. It picks the visitor's language on its own and remembers the choice.
 
-**Updates.** heron notices new releases on GitHub and can install them by itself. The owner sees the release notes in the panel and updates with one click, or lets heron do it on its own.
+**Updates.** heron notices new releases on GitHub and can install them by itself. The owner sees the release notes in the panel and updates with one click, or lets heron do it on its own. If a new version does not come up healthy, heron goes back to the one that worked.
+
+**Backups and moving in.** One command or one button saves the whole database, and heron keeps a copy from before every update. Monitors and notifications from Uptime Kuma come over in one go.
 
 **Extras.** SVG badges for your README, a small script that shows a notice on your own website during an outage, a `/metrics` endpoint for Prometheus and Grafana, and a dark admin panel that matches the public page.
 
@@ -53,6 +55,8 @@ It checks your sites, APIs, databases, containers and game servers, keeps a year
 ## The admin panel
 
 All monitors on one screen. Filter them by type or group, search by name or address, and drag rows to change the order on the public page.
+
+**Status page, Open the editor** shows the real public page with your live data. Hover a block to see what it is, click it to change it, drag it by the handle to move it, and use the plus between blocks to add a new one. Every block can be hidden without losing its settings. Switch between desktop and phone and between the three languages to check how visitors see it. Nothing changes for them until you press **Publish**, and Ctrl+Z undoes any step before that.
 
 <p align="center">
   <img src="docs/monitors.png" width="860" alt="The list of monitors in the admin panel">
@@ -253,6 +257,7 @@ Press **Update** and heron downloads the archive for your platform, checks it ag
 
 The new binary goes to `bin/heron` inside the data directory, so the service user can write it without root. The installer's systemd unit and the Docker image both work this way, and the update survives restarts: on every start heron runs the newest binary it has. If you later install a newer version over `/usr/local/bin/heron` by hand, the old download is thrown away.
 
+Before it downloads anything heron saves the database to `backups/before-update-<time>-<version>.db` and keeps the last five. The new version then has two minutes to answer on `/healthz`. If it does not, or if it crashes twice before that, heron puts the previous binary back, restores the database from that copy when the new version had already changed its schema, and starts the old version again. The panel tells the owner what happened, and automatic updates skip that release until you install it by hand.
 You can also update from a shell:
 
 ```bash
@@ -261,6 +266,36 @@ sudo systemctl restart heron
 ```
 
 `heron update -check` only tells you whether there is something new. Set `check_updates = false` if the server should never talk to GitHub on its own.
+
+## Backups
+
+**Settings, Backups, Download a backup** gives you the whole database as one SQLite file. On the server:
+
+```bash
+heron backup                     # writes data/backups/heron-<time>.db
+heron backup -o /mnt/heron.db    # or anywhere you like
+```
+
+It is safe to run while heron is serving. To bring a backup back, stop heron first:
+
+```bash
+sudo systemctl stop heron
+sudo -u heron heron restore /mnt/heron.db
+sudo systemctl start heron
+```
+
+`restore` checks that the file really is a heron database from this or an older version, and keeps the database it replaces as `heron.db.before-restore`.
+
+## Moving from Uptime Kuma
+
+Open **Settings, Move from Uptime Kuma** and drop either the JSON from Kuma's **Settings, Backup, Export** (Kuma 1.x) or its `kuma.db` file. heron shows what it will create and what it has to skip before anything is saved. The same works from a shell:
+
+```bash
+heron import kuma -dry-run kuma.db
+heron import kuma kuma.db
+```
+
+HTTP, keyword, TCP, ping, DNS, push, Postgres, Redis, Docker, gRPC, SMTP, Steam and Minecraft monitors come over with their groups, intervals and retries. Monitors that sat on a Kuma status page stay public, the rest are private. Telegram, Discord and webhook notifications become channels and stay attached to the same monitors. Push monitors keep their tokens, and heron answers on the same `/api/push/<token>` path, so once your domain points at heron the cron jobs keep working. Anything heron cannot check, like MQTT or Kafka, is listed as skipped.
 
 ## Webhooks
 
@@ -290,7 +325,10 @@ heron serve                    start the server
 heron user create -u name      create an account without the installer
 heron user passwd -u name      reset a password and sign out every session
 heron user reset-2fa -u name   turn off two-factor sign in for someone
-heron update [-check]         download the latest release over the binary
+heron backup [-o file]         save the database to a file
+heron restore [-force] file    replace the database with a backup
+heron import kuma [-dry-run] f bring monitors over from Uptime Kuma
+heron update [-check]          download the latest release over the binary
 heron version                  print the version
 ```
 

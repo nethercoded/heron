@@ -328,3 +328,29 @@
 .on-sheet .input-select:focus {
 	border-color: var(--color-ink);
 }
+
+.studio [data-edit] {
+	position: relative;
+	cursor: pointer;
+	border-radius: 12px;
+	outline: 1.5px solid transparent;
+	outline-offset: 5px;
+	transition: outline-color 0.15s;
+}
+
+.studio [data-edit]:hover {
+	outline-color: color-mix(in oklab, var(--color-accent) 45%, transparent);
+}
+
+.studio [data-edit][data-selected] {
+	outline: 2px solid var(--color-accent);
+}
+
+.studio [data-edit][data-invalid] {
+	outline: 2px solid var(--color-down);
+}
+
+.studio a,
+.studio button {
+	cursor: inherit;
+}

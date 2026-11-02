@@ -1,0 +1,303 @@
+<script lang="ts">
+	import type { Snippet } from 'svelte';
+	import { blockGroups, toneColor } from '#lib/blocks.ts';
+	import { useI18n } from '#lib/i18n.svelte.ts';
+	import { Clock } from '#lib/live.svelte.ts';
+	import { overallCopy } from '#lib/status.ts';
+	import type { Block, Group, Incident, Status, StatusPage } from '#lib/types.ts';
+	import HeronField from './HeronField.svelte';
+	import Icon from './Icon.svelte';
+	import IncidentCard from './IncidentCard.svelte';
+	import MaintenanceCard from './MaintenanceCard.svelte';
+	import UptimeBar from './UptimeBar.svelte';
+
+	let {
+		data,
+		blocks,
+		recent,
+		editing = false,
+		frame
+	}: {
+		data: StatusPage;
+		blocks: Block[];
+		recent: Incident[];
+		editing?: boolean;
+		frame?: Snippet<[Block, number, Snippet]>;
+	} = $props();
+
+	const i18n = useI18n();
+	const clock = new Clock(30_000);
+
+	const overall = $derived({ ...i18n.overall(data.status), tone: overallCopy[data.status].tone });
+
+	const color: Record<Status, string> = {
+		up: 'var(--color-up)',
+		degraded: 'var(--color-degraded)',
+		down: 'var(--color-down)',
+		maintenance: 'var(--color-accent)',
+		pending: 'var(--color-faint)',
+		paused: 'var(--color-faint)'
+	};
+	const water: Record<Status, string> = {
+		up: '#4cc3f5',
+		degraded: '#f5c53b',
+		down: '#ff4d4f',
+		maintenance: '#4cc3f5',
+		pending: '#4cc3f5',
+		paused: '#4cc3f5'
+	};
+	const severity: Status[] = ['down', 'degraded', 'maintenance', 'pending', 'paused', 'up'];
+
+	const monitors = $derived(data.groups.flatMap((g) => g.monitors));
+	const average = $derived(
+		monitors.length ? monitors.reduce((sum, m) => sum + m.uptime.history, 0) / monitors.length : null
+	);
+	const healthy = $derived(monitors.filter((m) => m.status === 'up' || m.status === 'degraded').length);
+	const historyDays = $derived(monitors[0]?.days.length ?? data.page.history_days ?? 90);
+	const uptimeDigits = $derived(
+		average == null ? '--.--' : average >= 1 ? '100' : i18n.number(Math.floor(average * 10000) / 100, 2)
+	);
+
+	const visible = $derived(
+		blocks.map((block, index) => ({ block, index })).filter(({ block }) => editing || (!block.hidden && !empty(block)))
+	);
+
+	function empty(block: Block) {
+		if (block.type === 'incidents') return data.incidents.length === 0;
+		if (block.type === 'maintenance') return data.maintenance.length === 0;
+		if (block.type === 'monitors') return block.group ? blockGroups(blocks, block, data.groups).length === 0 : false;
+		return false;
+	}
+
+	function worst(group: Group): Status {
+		const statuses = group.monitors.map((m) => m.status);
+		return severity.find((s) => statuses.includes(s)) ?? 'up';
+	}
+
+	function pastDays(span: number) {
+		void clock.now;
+		const today = new Date();
+		return Array.from({ length: span }, (_, i) => {
+			const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+			return {
+				key: d.toDateString(),
+				label: i18n.dayMonth(d),
+				weekday: i === 0 ? i18n.t('week.today') : i18n.weekday(d),
+				incidents: recent.filter((inc) => new Date(inc.started_at).toDateString() === d.toDateString())
+			};
+		});
+	}
+</script>
+
+{#snippet placeholder(text: string)}
+	<div class="rounded-card border border-dashed border-line-strong px-6 py-8 text-center text-sm text-faint">{text}</div>
+{/snippet}
+
+{#snippet hero(block: Block)}
+	{@const compact = block.style === 'compact'}
+	<section class="relative isolate overflow-hidden rounded-card bg-surface">
+		{#if !compact}
+			<HeronField water={water[overall.tone]} mirror={i18n.dir === 'rtl'} class="absolute inset-0 -z-20 size-full" />
+			<div class="absolute inset-y-0 start-0 -z-10 w-3/4 bg-linear-to-r from-surface via-surface/80 to-transparent sm:w-1/2 rtl:bg-linear-to-l"></div>
+		{/if}
+		<div class="flex flex-col justify-between {compact ? 'gap-6 p-6 sm:p-7' : 'min-h-[340px] gap-10 p-6 sm:min-h-[380px] sm:p-9'}">
+			<div class="max-w-md">
+				<p class="flex items-center gap-2.5 font-mono text-xs tracking-wider uppercase" style="color: {color[overall.tone]}">
+					<span class="sq blink" style="--c: {color[overall.tone]}; --s: 9px"></span>
+					{i18n.word(overall.tone)}
+				</p>
+				<h1 class="mt-4 font-semibold tracking-tight text-balance {compact ? 'text-3xl leading-tight' : 'text-4xl leading-[1.05] sm:text-5xl'}">{overall.title}</h1>
+				<p class="mt-3 text-ink/60" dir="auto">{data.page.description || overall.detail}</p>
+			</div>
+
+			{#if block.stats !== 'hide'}
+				<dl class="flex flex-wrap items-end gap-x-10 gap-y-5">
+					<div>
+						<dt class="mb-2 text-xs text-muted">{i18n.t('hero.uptime', { n: historyDays })}</dt>
+						<dd class="inline-flex items-baseline gap-1 text-3xl font-semibold" dir="ltr">
+							<span class="flap">{#each uptimeDigits.split('') as ch, i (i)}<i>{ch}</i>{/each}</span>
+							<span class="text-xl text-muted">%</span>
+						</dd>
+					</div>
+					<div>
+						<dt class="mb-2 text-xs text-muted">{i18n.t('hero.online')}</dt>
+						<dd class="font-mono text-3xl font-semibold">{healthy}<span class="text-muted">/{monitors.length}</span></dd>
+					</div>
+					<div>
+						<dt class="mb-2 text-xs text-muted">{i18n.t('hero.checked')}</dt>
+						<dd class="font-mono text-3xl font-semibold">{i18n.time(data.updated_at)}</dd>
+					</div>
+				</dl>
+			{/if}
+		</div>
+	</section>
+{/snippet}
+
+{#snippet notice(block: Block)}
+	{@const tone = toneColor[block.tone ?? 'info']}
+	<section class="relative overflow-hidden rounded-card bg-surface px-6 py-5 ps-7">
+		<span class="absolute inset-y-0 start-0 w-1" style="background: {tone}"></span>
+		{#if block.title}
+			<h2 class="flex items-center gap-2.5 font-semibold" dir="auto">
+				<span class="sq" style="--c: {tone}; --s: 8px"></span>
+				{block.title}
+			</h2>
+		{/if}
+		{#if block.body}
+			<p class="whitespace-pre-line text-ink/70 {block.title ? 'mt-1.5' : ''}" dir="auto">{block.body}</p>
+		{/if}
+	</section>
+{/snippet}
+
+{#snippet incidents(block: Block)}
+	{#if data.incidents.length > 0}
+		<section>
+			<h2 class="mb-4 flex items-center gap-2.5 text-sm font-medium text-muted">
+				<span class="sq blink" style="--c: var(--color-down); --s: 8px"></span>
+				<span dir="auto">{block.title || i18n.t('section.now')}</span>
+			</h2>
+			<div class="space-y-3">
+				{#each data.incidents as incident (incident.id)}
+					<IncidentCard {incident} href="/incidents/{incident.id}" />
+				{/each}
+			</div>
+		</section>
+	{:else}
+		{@render placeholder('Active incidents show up here, and only while one is open.')}
+	{/if}
+{/snippet}
+
+{#snippet maintenance(block: Block)}
+	{#if data.maintenance.length > 0}
+		<section>
+			<h2 class="mb-4 flex items-center gap-2.5 text-sm font-medium text-muted">
+				<span class="sq" style="--c: var(--color-accent); --s: 8px"></span>
+				<span dir="auto">{block.title || i18n.t('section.planned')}</span>
+			</h2>
+			<div class="space-y-3">
+				{#each data.maintenance as window (window.id)}
+					<MaintenanceCard {window} now={clock.now} />
+				{/each}
+			</div>
+		</section>
+	{:else}
+		{@render placeholder('Scheduled maintenance shows up here once you plan some.')}
+	{/if}
+{/snippet}
+
+{#snippet services(block: Block)}
+	{@const groups = blockGroups(blocks, block, data.groups)}
+	<section class="space-y-8">
+		{#each groups as group (group.name)}
+			{@const state = worst(group)}
+			<div>
+				<div class="mb-3 flex items-baseline justify-between gap-4 px-1">
+					<h2 class="text-lg font-semibold tracking-tight" dir="auto">{(block.group && block.title) || group.name || i18n.t('group.services')}</h2>
+					<span class="flex items-center gap-2 font-mono text-[11px] tracking-wider uppercase" style="color: {color[state]}">
+						<span class="sq" style="--c: {color[state]}; --s: 7px"></span>
+						{state === 'up' ? i18n.t('group.healthy') : i18n.status(state)}
+					</span>
+				</div>
+				<ul class="space-y-1 rounded-card bg-surface p-2">
+					{#each group.monitors as m (m.slug)}
+						<li>
+							<a href="/monitor/{m.slug}" class="group block rounded-xl px-4 transition hover:bg-sunken {block.style === 'list' ? 'py-3' : 'py-3.5'}">
+								<div class="flex items-center justify-between gap-4 {block.style === 'list' ? '' : 'mb-3'}">
+									<div class="flex min-w-0 items-center gap-3">
+										<span class="sq" style="--c: {color[m.status]}; --s: 10px"></span>
+										<span class="truncate font-medium" dir="auto">{m.name}</span>
+										{#if m.description}
+											<span class="hidden truncate text-sm text-faint md:inline" dir="auto">{m.description}</span>
+										{/if}
+									</div>
+									<div class="flex shrink-0 items-center gap-4 font-mono text-xs">
+										{#if m.status !== 'down' && m.latency_ms > 0}
+											<span class="hidden text-faint sm:inline">{i18n.latency(m.latency_ms)}</span>
+										{/if}
+										<span class="text-muted">{i18n.percent(m.uptime.history)}</span>
+										<span class="w-24 text-end tracking-wider uppercase" style="color: {color[m.status]}">{i18n.word(m.status)}</span>
+									</div>
+								</div>
+								{#if block.style !== 'list'}
+									<div class="hidden sm:block"><UptimeBar days={m.days} /></div>
+									<div class="sm:hidden"><UptimeBar days={m.days} compact /></div>
+								{/if}
+							</a>
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{:else}
+			{#if editing}
+				{@render placeholder(block.group ? `No public monitors in the group “${block.group}” yet.` : 'Every group already has its own block.')}
+			{:else}
+				<div class="rounded-card bg-surface p-10 text-center text-muted">{i18n.t('group.empty')}</div>
+			{/if}
+		{/each}
+	</section>
+{/snippet}
+
+{#snippet history(block: Block)}
+	<section>
+		<div class="mb-4 flex items-baseline justify-between px-1">
+			<h2 class="text-lg font-semibold tracking-tight" dir="auto">{block.title || i18n.t('last.days', { n: block.days || 7 })}</h2>
+			<a href="/incidents" class="flex items-center gap-1 text-sm text-muted hover:text-ink">{i18n.t('week.all')} <Icon name="chevron" size={13} class="rtl:-scale-x-100" /></a>
+		</div>
+		<ol class="rounded-card bg-surface p-2">
+			{#each pastDays(block.days || 7) as day (day.key)}
+				<li class="grid grid-cols-[5.5rem_1fr] gap-4 rounded-xl px-4 py-3">
+					<div class="font-mono text-xs leading-5">
+						<span class="block text-ink">{day.label}</span>
+						<span class="text-faint">{day.weekday}</span>
+					</div>
+					<div class="min-w-0">
+						{#each day.incidents as incident (incident.id)}
+							<a href="/incidents/{incident.id}" class="group mb-2 block last:mb-0">
+								<span class="flex items-center gap-2 font-medium group-hover:underline">
+									<span
+										class="sq"
+										style="--c: var(--color-{incident.impact === 'maintenance' ? 'accent' : incident.impact === 'minor' ? 'degraded' : 'down'}); --s: 8px"
+									></span>
+									{incident.title}
+									<span class="font-mono text-[11px] tracking-wider text-faint uppercase">{i18n.impact(incident.impact)}</span>
+								</span>
+								{#if incident.updates[0]}
+									<p class="mt-0.5 line-clamp-1 ps-4 text-sm text-muted" dir="auto">{incident.updates[0].body}</p>
+								{/if}
+							</a>
+						{:else}
+							<p class="text-sm leading-10 text-faint">{i18n.t('week.quiet')}</p>
+						{/each}
+					</div>
+				</li>
+			{/each}
+		</ol>
+	</section>
+{/snippet}
+
+{#snippet content(block: Block)}
+	{#if block.type === 'hero'}
+		{@render hero(block)}
+	{:else if block.type === 'notice'}
+		{@render notice(block)}
+	{:else if block.type === 'incidents'}
+		{@render incidents(block)}
+	{:else if block.type === 'maintenance'}
+		{@render maintenance(block)}
+	{:else if block.type === 'monitors'}
+		{@render services(block)}
+	{:else if block.type === 'history'}
+		{@render history(block)}
+	{/if}
+{/snippet}
+
+<div class="flex flex-col {editing ? 'gap-3' : 'gap-12'}">
+	{#each visible as { block, index } (block.id)}
+		{#if frame}
+			{#snippet inner()}{@render content(block)}{/snippet}
+			{@render frame(block, index, inner)}
+		{:else}
+			{@render content(block)}
+		{/if}
+	{/each}
+</div>

@@ -42,7 +42,7 @@ export type Kind =
 export type Overall = 'operational' | 'degraded' | 'partial_outage' | 'major_outage' | 'maintenance';
 export type Impact = 'minor' | 'major' | 'critical' | 'maintenance';
 export type IncidentStatus = 'investigating' | 'identified' | 'monitoring' | 'resolved';
-export type ChannelKind = 'telegram' | 'webhook';
+export type ChannelKind = 'telegram' | 'webhook' | 'discord';
 export type Range = '24h' | '7d' | '30d' | '90d';
 
 export interface Page {
@@ -52,6 +52,24 @@ export interface Page {
 	home_url?: string;
 	footer?: string;
 	history_days?: number;
+	blocks: Block[];
+}
+
+export type BlockType = 'hero' | 'notice' | 'incidents' | 'maintenance' | 'monitors' | 'history';
+
+export type Tone = 'info' | 'success' | 'warning' | 'danger';
+
+export interface Block {
+	id: string;
+	type: BlockType;
+	hidden?: boolean;
+	title?: string;
+	body?: string;
+	tone?: Tone;
+	group?: string;
+	style?: string;
+	days?: number;
+	stats?: string;
 }
 
 export interface Day {
@@ -210,6 +228,7 @@ export interface ChannelConfig {
 	url?: string;
 	secret?: string;
 	headers?: Record<string, string>;
+	mention?: string;
 }
 
 export interface Channel {

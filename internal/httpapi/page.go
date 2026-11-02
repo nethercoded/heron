@@ -25,8 +25,9 @@ func (s *Server) savePage(w http.ResponseWriter, r *http.Request) error {
 	page.Title = strings.TrimSpace(page.Title)
 	page.Description = strings.TrimSpace(page.Description)
 	page.Footer = strings.TrimSpace(page.Footer)
+	page.Blocks = store.NormalizeBlocks(page.Blocks)
 
-	fields := map[string]string{}
+	fields := store.ValidateBlocks(page.Blocks)
 	if page.Title == "" || len(page.Title) > 80 {
 		fields["title"] = "must be between 1 and 80 characters"
 	}

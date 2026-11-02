@@ -37,7 +37,9 @@
 						chat_id: form.config.chat_id,
 						thread_id: form.config.thread_id || undefined
 					}
-				: { url: form.config.url, secret: form.config.secret, headers: parseHeaders(headers) };
+				: form.kind === 'discord'
+					? { url: form.config.url, mention: form.config.mention || undefined }
+					: { url: form.config.url, secret: form.config.secret, headers: parseHeaders(headers) };
 		try {
 			await onsubmit({ ...form, config });
 		} catch (err) {
@@ -57,6 +59,7 @@
 		<Field label="Type" id="channel-kind" error={fields.kind}>
 			<select id="channel-kind" class="input-select" bind:value={form.kind}>
 				<option value="telegram">Telegram</option>
+				<option value="discord">Discord</option>
 				<option value="webhook">Webhook</option>
 			</select>
 		</Field>
@@ -70,6 +73,13 @@
 			</Field>
 			<Field label="Topic ID" id="thread-id" hint="Optional, for forum groups">
 				<input id="thread-id" type="number" class="input font-mono" bind:value={form.config.thread_id} />
+			</Field>
+		{:else if form.kind === 'discord'}
+			<Field label="Webhook URL" id="discord-url" hint="Channel settings → Integrations → Webhooks → Copy Webhook URL" error={fields.url} class="sm:col-span-2">
+				<input id="discord-url" class="input font-mono" autocomplete="off" placeholder="https://discord.com/api/webhooks/…" bind:value={form.config.url} aria-invalid={!!fields.url} />
+			</Field>
+			<Field label="Mention" id="discord-mention" hint="Optional. A role ID, @here or @everyone, pinged when a monitor goes down" class="sm:col-span-2">
+				<input id="discord-mention" class="input font-mono" placeholder="@here" bind:value={form.config.mention} />
 			</Field>
 		{:else}
 			<Field label="URL" id="hook-url" hint="Receives a JSON POST on every status change" error={fields.url} class="sm:col-span-2">

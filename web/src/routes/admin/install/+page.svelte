@@ -37,7 +37,7 @@
 	let password = $state('');
 	let confirm = $state('');
 
-	let page = $state<Page>({ title: '', description: '', logo_url: '', history_days: 90 });
+	let page = $state<Page>({ title: '', description: '', logo_url: '', history_days: 90, blocks: [] });
 	let monitorName = $state('');
 	let monitorURL = $state('');
 	let monitorId = $state<number | null>(null);

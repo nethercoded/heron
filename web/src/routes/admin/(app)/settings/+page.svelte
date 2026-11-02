@@ -2,6 +2,8 @@
 	import { untrack } from 'svelte';
 	import { ApiError, api, message } from '#lib/api.ts';
 	import Field from '#lib/components/Field.svelte';
+	import Icon from '#lib/components/Icon.svelte';
+	import KumaImport from '#lib/components/KumaImport.svelte';
 	import MetricsSettings from '#lib/components/MetricsSettings.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import SecuritySettings from '#lib/components/SecuritySettings.svelte';
@@ -10,7 +12,7 @@
 	import { badgeMarkdown, widgetSnippet } from '#lib/embed.ts';
 	import { canEdit } from '#lib/team.ts';
 	import { toast } from '#lib/toast.svelte.ts';
-	import type { Page, SiteSettings } from '#lib/types.ts';
+	import type { SiteSettings } from '#lib/types.ts';
 	import { goto } from '$app/navigation';
 	import { page as route } from '$app/state';
 	import type { PageProps } from './$types';
@@ -22,10 +24,6 @@
 
 	const origin = $derived(route.url.origin);
 	const widget = $derived(widgetSnippet(origin));
-
-	let page = $state<Page>(untrack(() => ({ ...data.page })));
-	let pageFields = $state<Record<string, string>>({});
-	let saving = $state(false);
 
 	let site = $state(untrack(() => ({ ...data.site, mode: data.site.mode || 'direct' })));
 	let siteFields = $state<Record<string, string>>({});
@@ -56,21 +54,6 @@
 	let next = $state('');
 	let repeat = $state('');
 	let passwordFields = $state<Record<string, string>>({});
-
-	async function savePage(event: SubmitEvent) {
-		event.preventDefault();
-		saving = true;
-		pageFields = {};
-		try {
-			page = await api.put<Page>('/admin/page', { ...page, history_days: Number(page.history_days) });
-			toast.success('Status page updated');
-		} catch (err) {
-			if (err instanceof ApiError) pageFields = err.fields;
-			toast.error(message(err));
-		} finally {
-			saving = false;
-		}
-	}
 
 	async function changePassword(event: SubmitEvent) {
 		event.preventDefault();
@@ -124,42 +107,34 @@
 	{#if data.updates}
 		<UpdateSettings updates={data.updates} />
 	{/if}
+
+	<section id="backups" class="card flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6">
+		<div class="max-w-xl min-w-0">
+			<h2 class="font-semibold">Backups</h2>
+			<p class="text-sm text-muted">
+				One file with every monitor, incident, person and setting. heron also keeps the last five copies from before each update in
+				<code class="kbd">backups</code> next to the database. To bring one back, stop heron and run
+				<code class="kbd">heron restore file.db</code>.
+			</p>
+		</div>
+		<a href="/api/admin/backup" download class="btn-secondary"><Icon name="download" /> Download a backup</a>
+	</section>
 	{/if}
 
 	{#if editor}
 
-	<form class="card p-5 sm:p-6" onsubmit={savePage} novalidate>
-		<h2 class="font-semibold">Status page</h2>
-		<p class="mb-5 text-sm text-muted">How the public page looks to your users.</p>
-
-		<div class="grid gap-4 sm:grid-cols-2">
-			<Field label="Title" id="title" error={pageFields.title}>
-				<input id="title" class="input" bind:value={page.title} aria-invalid={!!pageFields.title} />
-			</Field>
-			<Field label="History" id="history" hint="Days shown in uptime bars" error={pageFields.history_days}>
-				<select id="history" class="input-select" bind:value={page.history_days}>
-					{#each [30, 60, 90, 180, 365] as days (days)}<option value={days}>{days} days</option>{/each}
-				</select>
-			</Field>
-			<Field label="Description" id="description" class="sm:col-span-2">
-				<input id="description" class="input" placeholder="Live status of our services" bind:value={page.description} />
-			</Field>
-			<Field label="Logo URL" id="logo" error={pageFields.logo_url}>
-				<input id="logo" class="input" placeholder="https://example.com/logo.svg" bind:value={page.logo_url} aria-invalid={!!pageFields.logo_url} />
-			</Field>
-			<Field label="Website" id="home" hint="Where the logo links to" error={pageFields.home_url}>
-				<input id="home" class="input" placeholder="https://example.com" bind:value={page.home_url} aria-invalid={!!pageFields.home_url} />
-			</Field>
-			<Field label="Footer" id="footer" class="sm:col-span-2">
-				<input id="footer" class="input" bind:value={page.footer} />
-			</Field>
+	<section class="card flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6">
+		<div class="min-w-0">
+			<h2 class="font-semibold">Status page</h2>
+			<p class="text-sm text-muted">
+				{data.page.title} · {data.page.blocks.filter((b) => !b.hidden).length} blocks. Arrange them, write notices and pick what each one shows
+				right on the page.
+			</p>
 		</div>
+		<a href="/admin/page" class="btn-primary"><Icon name="layout" /> Open the editor</a>
+	</section>
 
-		<div class="mt-6 flex justify-end">
-			<button class="btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
-		</div>
-	</form>
-
+	<KumaImport />
 	<section class="card space-y-4 p-5 sm:p-6">
 		<div>
 			<h2 class="font-semibold">Embed</h2>

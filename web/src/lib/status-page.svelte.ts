@@ -1,11 +1,12 @@
 import { createContext } from 'svelte';
 import { api, message } from './api.ts';
 import { debounce, Live } from './live.svelte.ts';
-import type { LiveMonitor, StatusPage } from './types.ts';
+import type { LiveMonitor, Page, StatusPage } from './types.ts';
 
 export class StatusStore {
 	data = $state<StatusPage | null>(null);
 	error = $state<string | null>(null);
+	draft = $state<Page | null>(null);
 	live: Live;
 
 	constructor(initial: StatusPage | null) {
@@ -19,7 +20,7 @@ export class StatusStore {
 	}
 
 	get page() {
-		return this.data?.page ?? { title: 'Status' };
+		return this.draft ?? this.data?.page ?? ({ title: 'Status', blocks: [] } satisfies Page);
 	}
 
 	async load() {

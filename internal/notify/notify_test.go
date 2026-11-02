@@ -153,3 +153,49 @@ func TestChannelValidate(t *testing.T) {
 		}
 	}
 }
+
+func TestDiscord(t *testing.T) {
+	var got discordRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.UnmarshalRead(r.Body, &got)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(srv.Close)
+
+	f := Factory{Client: srv.Client(), UserAgent: "heron-test"}
+	n, _ := f.New(Channel{Kind: KindDiscord, Config: Config{URL: srv.URL, Mention: "123"}})
+	down := sample
+	down.Event, down.Downtime = EventDown, 0
+	if err := n.Notify(t.Context(), down); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Embeds) != 1 || got.Embeds[0].Title != "API <prod> is down" || got.Embeds[0].Color != discordRed {
+		t.Errorf("embeds = %+v", got.Embeds)
+	}
+	if got.Content != "<@&123>" || len(got.Mentions.Roles) != 1 || got.Mentions.Roles[0] != "123" {
+		t.Errorf("mention = %q %+v", got.Content, got.Mentions)
+	}
+
+	got = discordRequest{}
+	if err := n.Notify(t.Context(), sample); err != nil {
+		t.Fatal(err)
+	}
+	if got.Content != "" || got.Embeds[0].Color != discordGreen || len(got.Embeds[0].Fields) != 2 {
+		t.Errorf("recovered = %+v", got)
+	}
+}
+
+func TestDiscordURL(t *testing.T) {
+	for raw, want := range map[string]bool{
+		"https://discord.com/api/webhooks/1/abc":        true,
+		"https://canary.discord.com/api/webhooks/1/abc": true,
+		"https://discordapp.com/api/webhooks/1/abc":     true,
+		"http://discord.com/api/webhooks/1/abc":         false,
+		"https://discord.com.evil.io/api/webhooks/1":    false,
+		"https://discord.com/channels/1":                false,
+	} {
+		if validDiscordURL(raw) != want {
+			t.Errorf("%s: want %v", raw, want)
+		}
+	}
+}

@@ -9,16 +9,17 @@ import (
 )
 
 type Page struct {
-	Title       string `json:"title"`
-	Description string `json:"description,omitzero"`
-	LogoURL     string `json:"logo_url,omitzero"`
-	HomeURL     string `json:"home_url,omitzero"`
-	Footer      string `json:"footer,omitzero"`
-	HistoryDays int    `json:"history_days,omitzero"`
+	Title       string  `json:"title"`
+	Description string  `json:"description,omitzero"`
+	LogoURL     string  `json:"logo_url,omitzero"`
+	HomeURL     string  `json:"home_url,omitzero"`
+	Footer      string  `json:"footer,omitzero"`
+	HistoryDays int     `json:"history_days,omitzero"`
+	Blocks      []Block `json:"blocks"`
 }
 
 func DefaultPage() Page {
-	return Page{Title: "Status", HistoryDays: 90}
+	return Page{Title: "Status", HistoryDays: 90, Blocks: DefaultBlocks()}
 }
 
 func (s *Store) Page(ctx context.Context) (Page, error) {
@@ -34,6 +35,7 @@ func (s *Store) Page(ctx context.Context) (Page, error) {
 	if err := json.Unmarshal(raw, &page); err != nil {
 		return page, err
 	}
+	page.Blocks = NormalizeBlocks(page.Blocks)
 	return page, nil
 }
 

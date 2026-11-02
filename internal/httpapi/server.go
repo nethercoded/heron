@@ -171,6 +171,10 @@ func (s *Server) Handler() http.Handler {
 
 	admin.Handle("GET /api/admin/audit", s.handle(s.listAudit))
 
+	admin.Handle("GET /api/admin/backup", owner("backup.download", s.downloadBackup))
+	admin.Handle("POST /api/admin/import/kuma/preview", s.handle(s.role(store.RoleAdmin, s.previewKuma)))
+	admin.Handle("POST /api/admin/import/kuma", do("monitor.import", s.importKuma))
+
 	admin.Handle("GET /api/admin/updates", s.handle(s.role(store.RoleOwner, s.getUpdates)))
 	admin.Handle("POST /api/admin/updates/check", s.handle(s.role(store.RoleOwner, s.checkUpdates)))
 	admin.Handle("PUT /api/admin/updates", owner("settings.auto_update", s.saveUpdates))

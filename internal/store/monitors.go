@@ -282,3 +282,15 @@ func (s *Store) Record(ctx context.Context, id int64, r monitor.Result, current 
 		return err
 	})
 }
+
+func (s *Store) SlugTaken(ctx context.Context, slug string) (bool, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `select count(*) from monitors where slug = ?`, slug).Scan(&n)
+	return n > 0, err
+}
+
+func (s *Store) PushTokenTaken(ctx context.Context, token string) (bool, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `select count(*) from monitors where push_token = ?`, token).Scan(&n)
+	return n > 0, err
+}

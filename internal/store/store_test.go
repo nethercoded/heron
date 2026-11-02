@@ -316,3 +316,36 @@ func TestPageDefaults(t *testing.T) {
 		t.Errorf("title = %q", got.Title)
 	}
 }
+
+func TestBlocks(t *testing.T) {
+	s := open(t)
+	page, _ := s.Page(t.Context())
+	if len(page.Blocks) != len(DefaultBlocks()) {
+		t.Fatalf("blocks = %+v", page.Blocks)
+	}
+	page.Blocks = NormalizeBlocks([]Block{
+		{ID: "top", Type: BlockNotice, Title: "Moving", Body: "We move on Friday", Tone: "info", Group: "dropped"},
+		{ID: "api", Type: BlockMonitors, Group: "API", Style: "list", Days: 7},
+	})
+	if page.Blocks[0].Group != "" || page.Blocks[1].Days != 0 {
+		t.Errorf("normalize kept foreign settings: %+v", page.Blocks)
+	}
+	if fields := ValidateBlocks(page.Blocks); len(fields) > 0 {
+		t.Fatalf("fields = %v", fields)
+	}
+	if err := s.SavePage(t.Context(), page); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := s.Page(t.Context())
+	if len(got.Blocks) != 2 || got.Blocks[1].Group != "API" {
+		t.Errorf("blocks = %+v", got.Blocks)
+	}
+
+	bad := []Block{{ID: "a", Type: BlockHero}, {ID: "a", Type: BlockHero}, {ID: "Bad id", Type: "chart"}, {ID: "n", Type: BlockNotice}}
+	fields := ValidateBlocks(bad)
+	for _, key := range []string{"blocks.1.id", "blocks.1.type", "blocks.2.id", "blocks.2.type", "blocks.3.body"} {
+		if fields[key] == "" {
+			t.Errorf("no error for %s in %v", key, fields)
+		}
+	}
+}

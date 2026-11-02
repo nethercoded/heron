@@ -41,6 +41,7 @@
 				...(data.user.role === 'viewer'
 					? []
 					: [{ href: '/admin/channels', label: 'Notifications', icon: 'bell' } as const]),
+				{ href: '/admin/page', label: 'Status page', icon: 'layout' },
 				{ href: '/admin/people', label: 'People', icon: 'users' },
 				{ href: '/admin/audit', label: 'Audit log', icon: 'history' },
 				{ href: '/admin/settings', label: 'Settings', icon: 'settings' }

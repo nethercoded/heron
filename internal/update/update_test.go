@@ -171,13 +171,13 @@ func TestServiceInstall(t *testing.T) {
 		t.Fatalf("staged = %v %q", ok, version)
 	}
 
-	if err := Handoff(dir, "0.3.0"); err != nil {
+	if err := Handoff(dir, "0.3.0", nil, s.Log); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, ok := Staged(dir); !ok {
 		t.Fatal("handoff removed the binary it is running from")
 	}
-	if err := Handoff(dir, "0.4.0"); err != nil {
+	if err := Handoff(dir, "0.4.0", nil, s.Log); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, ok := Staged(dir); ok {
@@ -187,5 +187,138 @@ func TestServiceInstall(t *testing.T) {
 	up := &Service{Updater: testUpdater(gh, "0.3.0"), DataDir: dir, Log: slog.New(slog.DiscardHandler)}
 	if _, err := up.Begin(t.Context()); !errors.Is(err, ErrUpToDate) {
 		t.Fatalf("err = %v, want up to date", err)
+	}
+}
+
+func fakeExec(t *testing.T) *[]string {
+	var calls []string
+	old := execute
+	execute = func(path string) error {
+		calls = append(calls, path)
+		return nil
+	}
+	t.Cleanup(func() { execute = old })
+	return &calls
+}
+
+func TestRollbackAfterCrashes(t *testing.T) {
+	skipProbe(t)
+	calls := fakeExec(t)
+	gh := newFakeGitHub(t, "0.3.0", []byte("new binary"))
+	dir := t.TempDir()
+	log := slog.New(slog.DiscardHandler)
+	s := &Service{
+		Updater:  testUpdater(gh, "0.2.0"),
+		DataDir:  dir,
+		Auto:     func(context.Context) (bool, error) { return true, nil },
+		Snapshot: func(context.Context, string) (string, error) { return "snap.db", nil },
+		Restart:  func(string) {},
+		Log:      log,
+	}
+	if _, err := s.Install(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	for range maxAttempts {
+		if err := Handoff(dir, "0.2.0", nil, log); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(*calls) != maxAttempts {
+		t.Fatalf("launched %d times, want %d", len(*calls), maxAttempts)
+	}
+
+	var restored string
+	restore := func(_ context.Context, backup string) (bool, error) {
+		restored = backup
+		return true, nil
+	}
+	if err := Handoff(dir, "0.2.0", restore, log); err != nil {
+		t.Fatal(err)
+	}
+	if len(*calls) != maxAttempts {
+		t.Fatal("handoff launched a version that keeps failing")
+	}
+	if restored != "snap.db" {
+		t.Errorf("restored %q, want the snapshot taken before the update", restored)
+	}
+	if _, _, ok := Staged(dir); ok {
+		t.Error("the failed binary is still staged")
+	}
+	r, ok := LastRejected(dir)
+	if !ok || r.Version != "0.3.0" {
+		t.Fatalf("rejected = %+v %v", r, ok)
+	}
+	if st := s.Status(); !errors.As(st.Failed, &Rejected{}) {
+		t.Errorf("failed = %v", st.Failed)
+	}
+
+	s.tick(t.Context())
+	if _, _, ok := Staged(dir); ok {
+		t.Error("automatic updates installed the rejected version again")
+	}
+}
+
+func TestRollbackToPreviousStaged(t *testing.T) {
+	skipProbe(t)
+	calls := fakeExec(t)
+	dir := t.TempDir()
+	log := slog.New(slog.DiscardHandler)
+	staged := StagedPath(dir)
+	os.MkdirAll(filepath.Dir(staged), 0o750)
+	os.WriteFile(staged, []byte("old binary"), 0o755)
+	os.WriteFile(staged+".version", []byte("0.2.0\n"), 0o640)
+
+	gh := newFakeGitHub(t, "0.3.0", []byte("new binary"))
+	u := testUpdater(gh, "0.2.0")
+	rel, err := u.Latest(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := u.Stage(t.Context(), rel, dir, ""); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(prevPath(dir)); string(got) != "old binary" {
+		t.Fatalf("previous binary = %q", got)
+	}
+
+	ConfirmWithin, SettleFor, ProbeEvery = 30*time.Millisecond, 0, 5*time.Millisecond
+	t.Cleanup(func() { ConfirmWithin, SettleFor, ProbeEvery = 2*time.Minute, 20*time.Second, 5*time.Second })
+	sick := func(context.Context) error { return errors.New("database unavailable") }
+	if err := Confirm(t.Context(), dir, "0.3.0", sick, log); err == nil {
+		t.Fatal("confirm passed a sick version")
+	}
+
+	if err := Handoff(dir, "0.3.0", nil, log); err != nil {
+		t.Fatal(err)
+	}
+	if len(*calls) != 1 || (*calls)[0] != staged {
+		t.Fatalf("exec calls = %v, want the restored binary", *calls)
+	}
+	if got, _ := os.ReadFile(staged); string(got) != "old binary" {
+		t.Fatalf("staged = %q after rollback", got)
+	}
+	if r, _ := LastRejected(dir); r.Reason != "health check failed: database unavailable" {
+		t.Errorf("reason = %q", r.Reason)
+	}
+}
+
+func TestConfirmKeepsHealthyUpdate(t *testing.T) {
+	dir := t.TempDir()
+	staged := StagedPath(dir)
+	os.MkdirAll(filepath.Dir(staged), 0o750)
+	writeJSON(trialPath(staged), trial{Version: "0.3.0"})
+	writeJSON(rejectedPath(dir), Rejected{Version: "0.2.9"})
+
+	SettleFor, ProbeEvery = 0, 5*time.Millisecond
+	t.Cleanup(func() { SettleFor, ProbeEvery = 20*time.Second, 5*time.Second })
+	if err := Confirm(t.Context(), dir, "0.3.0", func(context.Context) error { return nil }, slog.New(slog.DiscardHandler)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(trialPath(staged)); !errors.Is(err, os.ErrNotExist) {
+		t.Error("trial survived a healthy start")
+	}
+	if _, ok := LastRejected(dir); ok {
+		t.Error("an old rejection survived a healthy update")
 	}
 }

@@ -39,6 +39,7 @@ const actions: Record<string, string> = {
 	'monitor.resume': 'resumed monitor',
 	'monitor.token': 'rotated the push token of',
 	'monitor.reorder': 'reordered monitors',
+	'monitor.import': 'imported from Uptime Kuma',
 	'channel.create': 'added notification channel',
 	'channel.update': 'edited notification channel',
 	'channel.delete': 'deleted notification channel',
@@ -54,7 +55,8 @@ const actions: Record<string, string> = {
 	'settings.metrics_token': 'issued a new metrics token',
 	'settings.metrics_off': 'turned off metrics',
 	'settings.auto_update': 'turned automatic updates',
-	'update.install': 'installed heron'
+	'update.install': 'installed heron',
+	'backup.download': 'downloaded a backup'
 };
 
 export const actionLabel = (action: string) => actions[action] ?? action;
@@ -77,7 +79,8 @@ export const auditGroups = [
 	{ value: 'user', label: 'People' },
 	{ value: 'account', label: 'Account security' },
 	{ value: 'settings', label: 'Settings' },
-	{ value: 'update', label: 'Updates' }
+	{ value: 'update', label: 'Updates' },
+	{ value: 'backup', label: 'Backups' }
 ];
 
 export function actionTone(action: string) {

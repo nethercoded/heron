@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	"encoding/json/v2"
 	"errors"
 	"flag"
 	"fmt"
@@ -45,6 +46,9 @@ Usage:
   heron user create -u name [-config]   create an administrator
   heron user passwd -u name [-config]   change a password
   heron user reset-2fa -u name          turn off two-factor sign in
+  heron backup [-o file]                save a copy of the database
+  heron restore [-force] file           replace the database with a backup
+  heron import kuma [-dry-run] file     bring monitors over from Uptime Kuma
   heron update [-check]                 download the latest release in place
   heron version                         print the version
 
@@ -68,11 +72,17 @@ func run(args []string) error {
 	case "serve":
 		err := serve(args)
 		if next, ok := errors.AsType[*update.Restart](err); ok {
-			return update.Exec(next.Path)
+			return update.Launch(next.Path)
 		}
 		return err
 	case "user":
 		return user(args)
+	case "backup":
+		return backup(args)
+	case "restore":
+		return restore(args)
+	case "import":
+		return importKuma(args)
 	case "update":
 		return selfUpdate(args)
 	case "version":
@@ -126,7 +136,10 @@ func serve(args []string) error {
 	slog.SetDefault(log)
 
 	ver := buildVersion()
-	if err := update.Handoff(cfg.DataDir, ver); err != nil {
+	rollback := func(ctx context.Context, backup string) (bool, error) {
+		return store.RestoreIfNewer(ctx, cfg.DatabasePath(), backup)
+	}
+	if err := update.Handoff(cfg.DataDir, ver, rollback, log); err != nil {
 		log.Warn("could not start the downloaded update, staying on the current version", "err", err)
 	}
 
@@ -173,6 +186,14 @@ func serve(args []string) error {
 			case restart <- path:
 			default:
 			}
+		},
+		Snapshot: func(ctx context.Context, version string) (string, error) {
+			dir := backupDir(cfg)
+			path := filepath.Join(dir, store.BackupName(autoBackup, time.Now(), version))
+			if err := db.Backup(ctx, path); err != nil {
+				return "", err
+			}
+			return path, store.Prune(dir, autoBackup, 5)
 		},
 		Log: log.With("component", "update"),
 	}
@@ -235,6 +256,13 @@ func serve(args []string) error {
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- srv.Serve(ln) }()
 
+	sick := make(chan error, 1)
+	go func() {
+		if err := update.Confirm(runCtx, cfg.DataDir, ver, selfCheck(ln.Addr(), ver), log.With("component", "update")); err != nil {
+			sick <- err
+		}
+	}()
+
 	var next string
 	select {
 	case err := <-serveErr:
@@ -243,6 +271,12 @@ func serve(args []string) error {
 		return err
 	case <-ctx.Done():
 	case next = <-restart:
+	case err := <-sick:
+		log.Error("this version is not healthy, going back to the previous one", "err", err)
+		if next, err = os.Executable(); err != nil {
+			cancelRun()
+			return err
+		}
 	}
 
 	log.Info("shutting down")
@@ -307,6 +341,36 @@ func selfUpdate(args []string) error {
 	}
 	fmt.Printf("updated %s to %s, restart heron to use it (systemctl restart heron)\n", exe, rel.Version())
 	return nil
+}
+
+func selfCheck(addr net.Addr, ver string) func(context.Context) error {
+	host, port, _ := net.SplitHostPort(addr.String())
+	if ip := net.ParseIP(host); ip == nil || ip.IsUnspecified() {
+		host = "127.0.0.1"
+	}
+	url := "http://" + net.JoinHostPort(host, port) + "/healthz"
+	client := &http.Client{Timeout: 5 * time.Second}
+	return func(ctx context.Context) error {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return err
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		var health struct {
+			Version string `json:"version"`
+		}
+		if err := json.UnmarshalRead(io.LimitReader(resp.Body, 4<<10), &health); err != nil || resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("/healthz answered %s", resp.Status)
+		}
+		if health.Version != ver {
+			return fmt.Errorf("/healthz reports version %q", health.Version)
+		}
+		return nil
+	}
 }
 
 func setupURL(cfg config.Config, addr net.Addr) string {

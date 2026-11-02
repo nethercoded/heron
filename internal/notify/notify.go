@@ -17,6 +17,7 @@ type Kind string
 const (
 	KindTelegram Kind = "telegram"
 	KindWebhook  Kind = "webhook"
+	KindDiscord  Kind = "discord"
 )
 
 type Channel struct {
@@ -36,6 +37,7 @@ type Config struct {
 	URL      string            `json:"url,omitzero"`
 	Secret   string            `json:"secret,omitzero"`
 	Headers  map[string]string `json:"headers,omitzero"`
+	Mention  string            `json:"mention,omitzero"`
 }
 
 func (c *Channel) Validate() error {
@@ -55,6 +57,10 @@ func (c *Channel) Validate() error {
 		u, err := url.Parse(c.Config.URL)
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 			errs = append(errs, &monitor.FieldError{Field: "url", Message: "must be an http or https url"})
+		}
+	case KindDiscord:
+		if !validDiscordURL(c.Config.URL) {
+			errs = append(errs, &monitor.FieldError{Field: "url", Message: "must be a Discord webhook url"})
 		}
 	default:
 		errs = append(errs, &monitor.FieldError{Field: "kind", Message: fmt.Sprintf("unknown kind %q", c.Kind)})
@@ -96,6 +102,8 @@ func (f Factory) New(c Channel) (Notifier, error) {
 		return &Telegram{client: f.Client, api: f.TelegramAPI, config: c.Config}, nil
 	case KindWebhook:
 		return &Webhook{client: f.Client, userAgent: f.UserAgent, config: c.Config}, nil
+	case KindDiscord:
+		return &Discord{client: f.Client, userAgent: f.UserAgent, config: c.Config}, nil
 	}
 	return nil, fmt.Errorf("unsupported channel kind %q", c.Kind)
 }
