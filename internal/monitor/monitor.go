@@ -16,24 +16,27 @@ import (
 type Kind string
 
 const (
-	KindHTTP      Kind = "http"
-	KindTCP       Kind = "tcp"
-	KindICMP      Kind = "icmp"
-	KindDNS       Kind = "dns"
-	KindPush      Kind = "push"
-	KindRedis     Kind = "redis"
-	KindPostgres  Kind = "postgres"
-	KindSMTP      Kind = "smtp"
-	KindIMAP      Kind = "imap"
-	KindDocker    Kind = "docker"
-	KindGRPC      Kind = "grpc"
-	KindMinecraft Kind = "minecraft"
-	KindSteam     Kind = "steam"
+	KindHTTP          Kind = "http"
+	KindTCP           Kind = "tcp"
+	KindICMP          Kind = "icmp"
+	KindDNS           Kind = "dns"
+	KindPush          Kind = "push"
+	KindRedis         Kind = "redis"
+	KindPostgres      Kind = "postgres"
+	KindSMTP          Kind = "smtp"
+	KindIMAP          Kind = "imap"
+	KindDocker        Kind = "docker"
+	KindGRPC          Kind = "grpc"
+	KindMinecraft     Kind = "minecraft"
+	KindSteam         Kind = "steam"
+	KindPelicanNode   Kind = "pelican_node"
+	KindPelicanServer Kind = "pelican_server"
 )
 
 var Kinds = []Kind{
 	KindHTTP, KindTCP, KindICMP, KindDNS, KindPush,
 	KindRedis, KindPostgres, KindSMTP, KindIMAP, KindDocker, KindGRPC, KindMinecraft, KindSteam,
+	KindPelicanNode, KindPelicanServer,
 }
 
 var defaultPorts = map[Kind]string{
@@ -112,6 +115,8 @@ type Settings struct {
 	Service         string            `json:"service,omitzero"`
 	DockerHost      string            `json:"docker_host,omitzero"`
 	MinPlayers      int               `json:"min_players,omitzero"`
+	DependsOn       int64             `json:"depends_on,omitzero"`
+	RecoverAfter    int               `json:"recover_after,omitzero"`
 }
 
 func (m *Monitor) DisplayTarget() string {
@@ -263,6 +268,12 @@ func (m *Monitor) Validate() error {
 	if m.Settings.DegradedAfterMS < 0 {
 		errs = append(errs, fieldErr("degraded_after_ms", "must not be negative"))
 	}
+	if m.Settings.RecoverAfter < 0 || m.Settings.RecoverAfter > MaxRetries {
+		errs = append(errs, fieldErr("recover_after", "must be between 0 and %d", MaxRetries))
+	}
+	if m.Settings.DependsOn < 0 || (m.ID != 0 && m.Settings.DependsOn == m.ID) {
+		errs = append(errs, fieldErr("depends_on", "must be another monitor"))
+	}
 
 	switch m.Kind {
 	case KindHTTP:
@@ -304,6 +315,10 @@ func (m *Monitor) Validate() error {
 			if _, _, err := net.SplitHostPort(r); err != nil && net.ParseIP(r) == nil {
 				errs = append(errs, fieldErr("resolver", "must be an ip address or host:port"))
 			}
+		}
+	case KindPelicanNode, KindPelicanServer:
+		if m.Target == "" {
+			errs = append(errs, fieldErr("target", "is required"))
 		}
 	case KindPush:
 		if m.Settings.GraceSeconds < 0 {

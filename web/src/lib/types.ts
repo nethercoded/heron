@@ -38,7 +38,9 @@ export type Kind =
 	| 'docker'
 	| 'grpc'
 	| 'minecraft'
-	| 'steam';
+	| 'steam'
+	| 'pelican_node'
+	| 'pelican_server';
 export type Overall = 'operational' | 'degraded' | 'partial_outage' | 'major_outage' | 'maintenance';
 export type Impact = 'minor' | 'major' | 'critical' | 'maintenance';
 export type IncidentStatus = 'investigating' | 'identified' | 'monitoring' | 'resolved';
@@ -190,6 +192,8 @@ export interface Settings {
 	service?: string;
 	docker_host?: string;
 	min_players?: number;
+	depends_on?: number;
+	recover_after?: number;
 }
 
 export interface MonitorInput {
@@ -330,4 +334,29 @@ export interface Updates {
 	busy: boolean;
 	failed?: string;
 	auto: boolean;
+}
+
+export interface ExpiryItem {
+	host: string;
+	kind: 'domain' | 'cert';
+	expires_at?: string;
+	days_left: number | null;
+	checked_at?: string;
+	issuer?: string;
+	error?: string;
+	monitors: { id: number; name: string }[];
+}
+
+export interface ExpiryList {
+	items: ExpiryItem[];
+	checking: boolean;
+}
+
+export interface PelicanSettings {
+	enabled: boolean;
+	url: string;
+	has_key: boolean;
+	public: boolean;
+	channel_ids: number[];
+	status: { synced_at?: string; nodes: number; servers: number; error?: string; syncing: boolean };
 }

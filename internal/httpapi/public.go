@@ -1,13 +1,17 @@
 package httpapi
 
 import (
+	"bytes"
 	"cmp"
+	"compress/gzip"
+	"context"
 	"encoding/json/v2"
 	"fmt"
 	"net/http"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nethercoded/heron/internal/engine"
@@ -34,21 +38,116 @@ type statusDTO struct {
 	UpdatedAt   stamp            `json:"updated_at"`
 }
 
+const statusFresh = 15 * time.Second
+
+type statusCache struct {
+	mu         sync.Mutex
+	version    uint64
+	at         time.Time
+	body       []byte
+	gzipped    []byte
+	refreshing bool
+}
+
 func (s *Server) status(w http.ResponseWriter, r *http.Request) error {
-	ctx := r.Context()
-	page, err := s.store.Page(ctx)
+	body, gzipped, err := s.statusBody(r)
 	if err != nil {
 		return err
 	}
+	h := w.Header()
+	h.Set("Content-Type", "application/json; charset=utf-8")
+	h.Set("Cache-Control", "no-cache")
+	h.Add("Vary", "Accept-Encoding")
+	if acceptsGzip(r) {
+		h.Set("Content-Encoding", "gzip")
+		body = gzipped
+	}
+	h.Set("Content-Length", strconv.Itoa(len(body)))
+	_, err = w.Write(body)
+	return err
+}
+
+func (s *Server) statusBody(r *http.Request) ([]byte, []byte, error) {
+	c := &s.statusCache
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	version := s.engine.Version()
+	if c.body != nil && c.version == version {
+		if time.Since(c.at) >= statusFresh && !c.refreshing {
+			c.refreshing = true
+			go s.refreshStatus(r.WithContext(context.WithoutCancel(r.Context())), version)
+		}
+		return c.body, c.gzipped, nil
+	}
+
+	body, gzipped, err := s.renderStatus(r)
+	if err != nil {
+		return nil, nil, err
+	}
+	c.version, c.at, c.body, c.gzipped = version, time.Now(), body, gzipped
+	return body, gzipped, nil
+}
+
+func (s *Server) refreshStatus(r *http.Request, version uint64) {
+	body, gzipped, err := s.renderStatus(r)
+	c := &s.statusCache
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.refreshing = false
+	if err != nil {
+		s.log.Warn("refresh status page", "err", err)
+		return
+	}
+	if c.version == version && s.engine.Version() == version {
+		c.at, c.body, c.gzipped = time.Now(), body, gzipped
+	}
+}
+
+func (s *Server) renderStatus(r *http.Request) ([]byte, []byte, error) {
+	dto, err := s.buildStatus(r)
+	if err != nil {
+		return nil, nil, err
+	}
+	body, err := json.Marshal(dto)
+	if err != nil {
+		return nil, nil, err
+	}
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	if _, err := zw.Write(body); err != nil {
+		return nil, nil, err
+	}
+	if err := zw.Close(); err != nil {
+		return nil, nil, err
+	}
+	return body, buf.Bytes(), nil
+}
+
+func acceptsGzip(r *http.Request) bool {
+	for part := range strings.SplitSeq(r.Header.Get("Accept-Encoding"), ",") {
+		name, q, _ := strings.Cut(strings.TrimSpace(part), ";")
+		if strings.EqualFold(strings.TrimSpace(name), "gzip") && strings.ReplaceAll(strings.TrimSpace(q), " ", "") != "q=0" {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Server) buildStatus(r *http.Request) (statusDTO, error) {
+	ctx := r.Context()
+	page, err := s.store.Page(ctx)
+	if err != nil {
+		return statusDTO{}, err
+	}
 	all, err := s.store.Monitors(ctx)
 	if err != nil {
-		return err
+		return statusDTO{}, err
 	}
 	public := slices.DeleteFunc(slices.Clone(all), func(m *monitor.Monitor) bool { return !m.Public })
 
 	dtos, err := s.publicMonitors(r, public, page.HistoryDays)
 	if err != nil {
-		return err
+		return statusDTO{}, err
 	}
 
 	var groups []groupDTO
@@ -62,7 +161,7 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) error {
 
 	active, err := s.store.Incidents(ctx, store.IncidentFilter{OpenOnly: true})
 	if err != nil {
-		return err
+		return statusDTO{}, err
 	}
 	byID := index(all)
 	incidents := make([]incidentDTO, 0, len(active))
@@ -70,15 +169,14 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) error {
 		incidents = append(incidents, toIncident(inc, byID, false))
 	}
 
-	w.Header().Set("Cache-Control", "no-cache")
-	return ok(w, statusDTO{
+	return statusDTO{
 		Page:        page,
 		Status:      summarize(public, active),
 		Groups:      groups,
 		Incidents:   incidents,
 		Maintenance: s.publicMaintenance(byID, time.Now()),
 		UpdatedAt:   stamp(time.Now()),
-	})
+	}, nil
 }
 
 func (s *Server) publicMonitors(r *http.Request, list []*monitor.Monitor, historyDays int) ([]publicMonitorDTO, error) {
@@ -87,13 +185,9 @@ func (s *Server) publicMonitors(r *http.Request, list []*monitor.Monitor, histor
 	historyDays = max(historyDays, 1)
 
 	periods := []time.Duration{24 * time.Hour, 7 * 24 * time.Hour, 30 * 24 * time.Hour, time.Duration(historyDays) * 24 * time.Hour}
-	uptimes := make([]map[int64]store.Uptime, len(periods))
-	for i, p := range periods {
-		u, err := s.store.Uptimes(ctx, now.Add(-p))
-		if err != nil {
-			return nil, err
-		}
-		uptimes[i] = u
+	uptimes, err := s.store.UptimeWindows(ctx, now, periods...)
+	if err != nil {
+		return nil, err
 	}
 
 	ids := make([]int64, 0, len(list))
@@ -129,10 +223,10 @@ func (s *Server) publicMonitors(r *http.Request, list []*monitor.Monitor, histor
 			CheckedAt:   stamp(m.State.CheckedAt),
 			LatencyMS:   m.State.Latency.Milliseconds(),
 			Uptime: uptimeDTO{
-				Day:     uptimes[0][m.ID].Ratio(),
-				Week:    uptimes[1][m.ID].Ratio(),
-				Month:   uptimes[2][m.ID].Ratio(),
-				History: uptimes[3][m.ID].Ratio(),
+				Day:     window(uptimes[m.ID], 0).Ratio(),
+				Week:    window(uptimes[m.ID], 1).Ratio(),
+				Month:   window(uptimes[m.ID], 2).Ratio(),
+				History: window(uptimes[m.ID], 3).Ratio(),
 			},
 			Days: fillDays(days[m.ID], from, historyDays, s.opts.Location),
 		})
@@ -499,4 +593,11 @@ func index(list []*monitor.Monitor) map[int64]*monitor.Monitor {
 		out[m.ID] = m
 	}
 	return out
+}
+
+func window(w []store.Uptime, i int) store.Uptime {
+	if i < len(w) {
+		return w[i]
+	}
+	return store.Uptime{}
 }

@@ -78,7 +78,9 @@ export const kindLabel: Record<Kind, string> = {
 	docker: 'Docker',
 	grpc: 'gRPC',
 	minecraft: 'Minecraft',
-	steam: 'Steam'
+	steam: 'Steam',
+	pelican_node: 'Pelican node',
+	pelican_server: 'Pelican server'
 };
 
 export function dayTone(uptime: number | null, degraded = 0) {

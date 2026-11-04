@@ -29,6 +29,7 @@ type Webhook struct {
 
 type webhookPayload struct {
 	Event    Event          `json:"event"`
+	Title    string         `json:"title,omitzero"`
 	At       time.Time      `json:"at"`
 	Status   string         `json:"status,omitzero"`
 	Reason   string         `json:"reason,omitzero"`
@@ -48,6 +49,7 @@ type webhookTarget struct {
 func (w *Webhook) Notify(ctx context.Context, msg Message) error {
 	payload := webhookPayload{
 		Event:    msg.Event,
+		Title:    msg.Title,
 		At:       msg.At.UTC(),
 		Status:   string(msg.Status),
 		Reason:   msg.Reason,

@@ -61,7 +61,9 @@ export const targetCopy: Record<Kind, { label: string; placeholder: string; hint
 	imap: { label: 'Host and port', placeholder: 'mail.example.com', hint: 'Port defaults to 143, or 993 with TLS' },
 	docker: { label: 'Container', placeholder: 'web-1', hint: 'Name or id of the container' },
 	minecraft: { label: 'Server address', placeholder: 'play.example.com', hint: 'Port defaults to 25565' },
-	steam: { label: 'Server address', placeholder: '203.0.113.10:27015', hint: 'Query port, defaults to 27015' }
+	steam: { label: 'Server address', placeholder: '203.0.113.10:27015', hint: 'Query port, defaults to 27015' },
+	pelican_node: { label: 'Node', placeholder: '' },
+	pelican_server: { label: 'Server', placeholder: '' }
 };
 
 export function blank(): MonitorInput {
@@ -151,7 +153,13 @@ export const otherKinds: { value: Kind; label: string }[] = [
 	{ value: 'steam', label: 'Steam game server' }
 ];
 
-export const kindLabel = (kind: Kind) => [...commonKinds, ...otherKinds].find((k) => k.value === kind)?.label ?? kind;
+export const kindLabel = (kind: Kind) =>
+	[
+		...commonKinds,
+		...otherKinds,
+		{ value: 'pelican_node', label: 'Pelican node' },
+		{ value: 'pelican_server', label: 'Pelican game server' }
+	].find((k) => k.value === kind)?.label ?? kind;
 
 const schemes: Record<string, Kind> = {
 	http: 'http',

@@ -73,11 +73,15 @@ type Event string
 const (
 	EventDown      Event = "monitor.down"
 	EventRecovered Event = "monitor.recovered"
+	EventFlapping  Event = "monitor.flapping"
+	EventStable    Event = "monitor.stable"
+	EventExpiring  Event = "expiry.soon"
 	EventTest      Event = "test"
 )
 
 type Message struct {
 	Event    Event
+	Title    string
 	Monitor  *monitor.Monitor
 	Status   monitor.Status
 	Reason   string

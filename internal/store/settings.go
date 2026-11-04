@@ -105,3 +105,33 @@ func (s *Store) SetAutoUpdate(ctx context.Context, on bool) error {
 	_, err := s.db.ExecContext(ctx, `insert into settings (key, value) values ('auto_update', 'on') on conflict (key) do update set value = excluded.value`)
 	return err
 }
+
+type Pelican struct {
+	Enabled    bool    `json:"enabled"`
+	URL        string  `json:"url"`
+	Key        string  `json:"key,omitzero"`
+	Public     bool    `json:"public"`
+	ChannelIDs []int64 `json:"channel_ids,omitzero"`
+}
+
+func (s *Store) Pelican(ctx context.Context) (Pelican, error) {
+	var out Pelican
+	var raw []byte
+	err := s.db.QueryRowContext(ctx, `select value from settings where key = 'pelican'`).Scan(&raw)
+	if errors.Is(translate(err), ErrNotFound) {
+		return out, nil
+	}
+	if err != nil {
+		return out, err
+	}
+	return out, json.Unmarshal(raw, &out)
+}
+
+func (s *Store) SavePelican(ctx context.Context, p Pelican) error {
+	raw, err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `insert into settings (key, value) values ('pelican', ?) on conflict (key) do update set value = excluded.value`, raw)
+	return err
+}

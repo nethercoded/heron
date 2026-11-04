@@ -26,10 +26,12 @@ import (
 	"github.com/nethercoded/heron/internal/auth"
 	"github.com/nethercoded/heron/internal/config"
 	"github.com/nethercoded/heron/internal/engine"
+	"github.com/nethercoded/heron/internal/expiry"
 	"github.com/nethercoded/heron/internal/httpapi"
 	"github.com/nethercoded/heron/internal/maintenance"
 	"github.com/nethercoded/heron/internal/monitor"
 	"github.com/nethercoded/heron/internal/notify"
+	"github.com/nethercoded/heron/internal/pelican"
 	"github.com/nethercoded/heron/internal/scheduler"
 	"github.com/nethercoded/heron/internal/site"
 	"github.com/nethercoded/heron/internal/store"
@@ -164,7 +166,19 @@ func serve(args []string) error {
 		return fmt.Errorf("load maintenance windows: %w", err)
 	}
 	checkers := monitor.NewRegistry(userAgent, cfg.ICMPPrivileged)
+	panel := pelican.New(db, log.With("component", "pelican"))
+	checkers[monitor.KindPelicanNode] = panel
+	checkers[monitor.KindPelicanServer] = panel
 	sched := scheduler.New(checkers, eng, log.With("component", "scheduler"))
+	panel.OnChange = func(m *monitor.Monitor, removed bool) {
+		if removed {
+			sched.Stop(m.ID)
+			eng.Forget(m.ID)
+		} else {
+			sched.Sync(m)
+		}
+		eng.Changed(m)
+	}
 
 	monitors, err := db.Monitors(ctx)
 	if err != nil {
@@ -175,6 +189,17 @@ func serve(args []string) error {
 	sched.Start(runCtx, monitors)
 	go eng.Housekeep(runCtx, time.Duration(cfg.RetentionDays)*24*time.Hour)
 	go eng.WatchMaintenance(runCtx)
+
+	expiries := &expiry.Service{
+		Store:  db,
+		Prober: expiry.NewChecker(),
+		Sender: dispatcher,
+		Link:   eng.Link,
+		Every:  12 * time.Hour,
+		Log:    log.With("component", "expiry"),
+	}
+	go expiries.Run(runCtx)
+	go panel.Run(runCtx)
 
 	restart := make(chan string, 1)
 	updates := &update.Service{
@@ -237,6 +262,8 @@ func serve(args []string) error {
 		Assets:         web.Assets(),
 		Updates:        updates,
 		Checker:        checkers,
+		Expiry:         expiries,
+		Pelican:        panel,
 		DemoUser:       demoUser,
 		DemoPassword:   demoPassword,
 	})

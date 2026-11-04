@@ -32,7 +32,8 @@
 					count: data.counts.incidents,
 					alert: data.counts.incidents > 0
 				},
-				{ href: '/admin/maintenance', label: 'Maintenance', icon: 'wrench' }
+				{ href: '/admin/maintenance', label: 'Maintenance', icon: 'wrench' },
+				{ href: '/admin/expiry', label: 'Expiry', icon: 'shield' }
 			]
 		},
 		{

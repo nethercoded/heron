@@ -2,6 +2,9 @@ package store
 
 import (
 	"context"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/nethercoded/heron/internal/monitor"
@@ -41,22 +44,54 @@ type Beat struct {
 }
 
 func (s *Store) Uptimes(ctx context.Context, since time.Time) (map[int64]Uptime, error) {
+	windows, err := s.UptimeWindows(ctx, time.Now(), time.Since(since))
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int64]Uptime, len(windows))
+	for id, w := range windows {
+		out[id] = w[0]
+	}
+	return out, nil
+}
+
+func (s *Store) UptimeWindows(ctx context.Context, now time.Time, periods ...time.Duration) (map[int64][]Uptime, error) {
+	out := map[int64][]Uptime{}
+	if len(periods) == 0 {
+		return out, nil
+	}
+	starts := make([]any, len(periods))
+	var sums strings.Builder
+	oldest := now
+	for i, p := range periods {
+		start := now.Add(-p).Truncate(time.Hour)
+		if start.Before(oldest) {
+			oldest = start
+		}
+		starts[i] = start.Unix()
+		fmt.Fprintf(&sums, ", sum(case when r.bucket >= ?%[1]d then r.total else 0 end), sum(case when r.bucket >= ?%[1]d then r.down else 0 end)", i+1)
+	}
+
 	rows, err := s.db.QueryContext(ctx, `
-		select monitor_id, sum(total), sum(down) from rollups
-		where bucket >= ? group by monitor_id`, since.Truncate(time.Hour).Unix())
+		select m.id`+sums.String()+`
+		from monitors m join rollups r on r.monitor_id = m.id and r.bucket >= ?`+strconv.Itoa(len(periods)+1)+`
+		group by m.id`, append(starts, oldest.Unix())...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	out := map[int64]Uptime{}
 	for rows.Next() {
 		var id int64
-		var u Uptime
-		if err := rows.Scan(&id, &u.Total, &u.Down); err != nil {
+		w := make([]Uptime, len(periods))
+		dest := []any{&id}
+		for i := range w {
+			dest = append(dest, &w[i].Total, &w[i].Down)
+		}
+		if err := rows.Scan(dest...); err != nil {
 			return nil, err
 		}
-		out[id] = u
+		out[id] = w
 	}
 	return out, rows.Err()
 }

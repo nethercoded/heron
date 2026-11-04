@@ -20,5 +20,5 @@
 <PageHeader title="Edit {data.monitor.name}" back={{ href: `/admin/monitors/${data.monitor.id}`, label: data.monitor.name }} />
 
 {#key data.monitor.id}
-	<MonitorForm initial={fromMonitor(data.monitor)} channels={data.channels} submitLabel="Save changes" editing onsubmit={save} />
+	<MonitorForm initial={fromMonitor(data.monitor)} channels={data.channels} monitors={data.monitors} self={data.monitor.id} submitLabel="Save changes" editing onsubmit={save} />
 {/key}

@@ -25,12 +25,16 @@
 	let {
 		initial,
 		channels,
+		monitors = [],
+		self = 0,
 		submitLabel,
 		editing = false,
 		onsubmit
 	}: {
 		initial: MonitorInput;
 		channels: Channel[];
+		monitors?: { id: number; name: string; group: string }[];
+		self?: number;
 		submitLabel: string;
 		editing?: boolean;
 		onsubmit: (input: MonitorInput) => Promise<void>;
@@ -55,6 +59,8 @@
 	let checking = $state(false);
 	let result = $state<{ status: Status; latency_ms: number; message: string } | null>(null);
 
+	const managed = $derived(form.kind === 'pelican_node' || form.kind === 'pelican_server');
+	const parents = $derived(monitors.filter((m) => m.id !== self));
 	const guessed = $derived(picked ? form.kind : (detect(form.target) ?? form.kind));
 	const target = $derived(targetCopy[guessed]);
 	const suggestedName = $derived(nameFrom(guessed, form.target));
@@ -189,6 +195,16 @@
 					{/each}
 				</select>
 			</Field>
+		{:else if managed}
+			<div class="flex flex-wrap items-start justify-between gap-3">
+				<div>
+					<h2 class="font-semibold">Synced from Pelican</h2>
+					<p class="mt-1 text-sm text-muted">
+						{form.kind === 'pelican_node' ? 'A node, checked through its Wings daemon.' : 'A game server, checked through the Wings daemon on its node.'} heron keeps it in sync with the panel and removes it when you delete it there.
+					</p>
+				</div>
+				<button type="button" class="btn-secondary" disabled={checking} onclick={test}>{checking ? 'Checking…' : 'Check now'}</button>
+			</div>
 		{:else}
 			<div>
 				<label for="target" class="mb-2 block text-[15px] font-semibold">What should heron watch?</label>
@@ -228,7 +244,7 @@
 			</div>
 		{/if}
 
-		<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted">
+		<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted {managed ? 'hidden' : ''}">
 			{#if form.kind !== 'push' && form.target.trim() && address !== form.target.trim()}
 				<span>heron will check <span class="font-mono text-ink-2">{address}</span> ·</span>
 			{/if}
@@ -330,6 +346,39 @@
 					{/if}
 					<Field label="Alert after" id="retries" hint="Failed checks in a row" error={fields.retries}>
 						<input id="retries" type="number" min="0" max="10" class="input" bind:value={form.retries} />
+					</Field>
+				</div>
+
+				<div class="grid gap-4 sm:grid-cols-3">
+					<Field
+						label="Depends on"
+						id="depends-on"
+						hint="While that one is down, heron sends one alert for both instead of one each"
+						error={fields.depends_on}
+						class="sm:col-span-2"
+					>
+						<select
+							id="depends-on"
+							class="input-select"
+							value={form.settings.depends_on ?? 0}
+							onchange={(e) => (form.settings.depends_on = Number(e.currentTarget.value) || undefined)}
+						>
+							<option value={0}>Nothing</option>
+							{#each parents as parent (parent.id)}
+								<option value={parent.id}>{parent.name}{parent.group && parent.group !== parent.name ? ` · ${parent.group}` : ''}</option>
+							{/each}
+						</select>
+					</Field>
+					<Field label="Back up after" id="recover-after" hint="Good checks in a row before it counts as recovered" error={fields.recover_after}>
+						<input
+							id="recover-after"
+							type="number"
+							min="1"
+							max="10"
+							class="input"
+							value={form.settings.recover_after || 1}
+							oninput={(e) => (form.settings.recover_after = Number(e.currentTarget.value) > 1 ? Number(e.currentTarget.value) : undefined)}
+						/>
 					</Field>
 				</div>
 

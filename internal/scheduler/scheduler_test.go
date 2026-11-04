@@ -182,3 +182,25 @@ func TestTrigger(t *testing.T) {
 		}
 	})
 }
+
+func TestRecoverAfter(t *testing.T) {
+	m := &monitor.Monitor{Retries: 0, Settings: monitor.Settings{RecoverAfter: 3}, State: monitor.State{Status: monitor.StatusUp}}
+	tr := newTracker(m)
+	steps := []struct {
+		in, want monitor.Status
+	}{
+		{monitor.StatusDown, monitor.StatusDown},
+		{monitor.StatusUp, monitor.StatusDown},
+		{monitor.StatusUp, monitor.StatusDown},
+		{monitor.StatusDown, monitor.StatusDown},
+		{monitor.StatusUp, monitor.StatusDown},
+		{monitor.StatusUp, monitor.StatusDown},
+		{monitor.StatusUp, monitor.StatusUp},
+	}
+	for i, s := range steps {
+		tr.observe(s.in)
+		if tr.status != s.want {
+			t.Fatalf("step %d: status %s, want %s", i, tr.status, s.want)
+		}
+	}
+}

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -62,6 +63,9 @@ func (s *Server) createMonitor(w http.ResponseWriter, r *http.Request) error {
 	if err := m.Validate(); err != nil {
 		return invalid(err)
 	}
+	if err := s.checkParent(r, m); err != nil {
+		return err
+	}
 
 	if err := s.store.CreateMonitor(r.Context(), m); err != nil {
 		return slugConflict(err)
@@ -88,6 +92,9 @@ func (s *Server) updateMonitor(w http.ResponseWriter, r *http.Request) error {
 	m.Normalize()
 	if err := m.Validate(); err != nil {
 		return invalid(err)
+	}
+	if err := s.checkParent(r, m); err != nil {
+		return err
 	}
 	if kindChanged {
 		m.State.CheckedAt = time.Time{}
@@ -209,6 +216,9 @@ func (s *Server) testMonitor(w http.ResponseWriter, r *http.Request) error {
 	if err := m.Validate(); err != nil {
 		return invalid(err)
 	}
+	if err := s.checkParent(r, m); err != nil {
+		return err
+	}
 	if m.Kind == monitor.KindPush {
 		return badRequest("push monitors wait for your job to call them, there is nothing to check yet")
 	}
@@ -217,4 +227,22 @@ func (s *Server) testMonitor(w http.ResponseWriter, r *http.Request) error {
 	}
 	res := s.opts.Checker.Check(r.Context(), m)
 	return ok(w, map[string]any{"status": res.Status, "latency_ms": res.Latency.Milliseconds(), "message": res.Message})
+}
+
+func (s *Server) checkParent(r *http.Request, m *monitor.Monitor) error {
+	parent := m.Settings.DependsOn
+	for depth := 0; parent != 0; depth++ {
+		if parent == m.ID || depth > 20 {
+			return invalid(&monitor.FieldError{Field: "depends_on", Message: "would make a loop"})
+		}
+		p, err := s.store.Monitor(r.Context(), parent)
+		if errors.Is(err, store.ErrNotFound) {
+			return invalid(&monitor.FieldError{Field: "depends_on", Message: "no such monitor"})
+		}
+		if err != nil {
+			return err
+		}
+		parent = p.Settings.DependsOn
+	}
+	return nil
 }

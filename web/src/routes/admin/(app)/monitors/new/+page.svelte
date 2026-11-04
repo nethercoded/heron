@@ -19,4 +19,4 @@
 
 <PageHeader title="New monitor" back={{ href: '/admin', label: 'Monitors' }} />
 
-<MonitorForm initial={blank()} channels={data.channels} submitLabel="Create monitor" onsubmit={create} />
+<MonitorForm initial={blank()} channels={data.channels} monitors={data.monitors} submitLabel="Create monitor" onsubmit={create} />

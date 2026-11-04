@@ -6,6 +6,7 @@
 	import KumaImport from '#lib/components/KumaImport.svelte';
 	import MetricsSettings from '#lib/components/MetricsSettings.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
+	import PelicanSettings from '#lib/components/PelicanSettings.svelte';
 	import SecuritySettings from '#lib/components/SecuritySettings.svelte';
 	import Snippet from '#lib/components/Snippet.svelte';
 	import UpdateSettings from '#lib/components/UpdateSettings.svelte';
@@ -133,6 +134,10 @@
 		</div>
 		<a href="/admin/page" class="btn-primary"><Icon name="layout" /> Open the editor</a>
 	</section>
+
+	{#if data.pelican}
+		<PelicanSettings settings={data.pelican} channels={data.channels} {owner} />
+	{/if}
 
 	<KumaImport />
 	<section class="card space-y-4 p-5 sm:p-6">

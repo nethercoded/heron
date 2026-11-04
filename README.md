@@ -40,7 +40,7 @@ It checks your sites, APIs, databases, containers and game servers, keeps a year
 
 **Incidents and maintenance.** Incidents open and resolve on their own, and you can write updates by hand. Maintenance windows can be one-off or repeat every day or week. While one is running, alerts stay quiet and the page tells visitors what is going on.
 
-**Alerts.** Telegram (topics in forum groups work too), Discord with an optional role ping, and signed webhooks, with retries. A monitor only counts as down after the number of failed checks you choose, so a single hiccup does not wake you up.
+**Alerts.** Telegram (topics in forum groups work too), Discord with an optional role ping, and signed webhooks, with retries. A monitor only counts as down after the number of failed checks you choose, so a single hiccup does not wake you up. Tell heron what depends on what and a dead server sends one alert, not one for every service on it. A monitor that keeps going up and down sends one "flapping" alert and then stays quiet until it settles.
 
 **Team.** Invite people with a one-time link and give them a role. Owners manage people and the domain, admins run monitors and incidents, viewers can look around but not touch anything. An audit log keeps a year of who changed what.
 
@@ -49,6 +49,10 @@ It checks your sites, APIs, databases, containers and game servers, keeps a year
 **Three languages.** The public page speaks English, Russian and Hebrew, with proper right-to-left layout. It picks the visitor's language on its own and remembers the choice.
 
 **Updates.** heron notices new releases on GitHub and can install them by itself. The owner sees the release notes in the panel and updates with one click, or lets heron do it on its own. If a new version does not come up healthy, heron goes back to the one that worked.
+
+**Game server hosting.** Connect a Pelican or Pterodactyl panel and heron watches every node through Wings and every game server on it, with memory and CPU in the check result. New servers show up on their own and deleted ones go away.
+
+**Expiry.** Every domain and certificate behind your monitors on one screen, with a warning 30, 7 and 1 day before it runs out. Domains are looked up over RDAP, with WHOIS for zones like .ru that have no RDAP.
 
 **Backups and moving in.** One command or one button saves the whole database, and heron keeps a copy from before every update. Monitors and notifications from Uptime Kuma come over in one go.
 
@@ -326,6 +330,26 @@ sudo heron backup -o /var/lib/heron/seed.db
 sudo cp deploy/demo/heron-demo-reset.* /etc/systemd/system/
 sudo systemctl enable --now heron-demo-reset.timer
 ```
+
+## Alert rules
+
+Three settings under **More settings** on every monitor keep the noise down.
+
+**Depends on.** Point a monitor at the one it needs, like a site at its server or a game server at its node. While the parent is down, the monitors that depend on it stay quiet and the parent's alert says how many there are. If one of them goes down first, heron waits for the parent's next checks before it decides who to blame. When the parent comes back and a dependent is still down two minutes later, that dependent gets an alert of its own.
+
+**Alert after** and **Back up after.** How many failed checks in a row make a monitor down, and how many good ones in a row bring it back.
+
+**Flapping.** When a monitor changes between up and down six times within an hour, heron sends one alert saying so and holds the rest. Once it has stayed in one state for half an hour, a last message says it is stable again.
+
+## Domain and certificate expiry
+
+**Expiry** in the sidebar lists every domain and HTTPS certificate that your website and DNS monitors use. heron checks them twice a day: certificates by connecting to the site, domains through the registry's RDAP service, or WHOIS for zones without one. Alerts go to the channels of the monitors that use the domain, 30, 7 and 1 day before the date and once more if it passes.
+
+## Pelican and Pterodactyl
+
+In the panel create an application API key with read access to nodes and servers (**Admin, API Keys**). Then open **Settings, Pelican** in heron, paste the panel address and the key and press **Save and sync**.
+
+heron adds a monitor for every node and every game server and syncs every five minutes. Nodes are checked through their Wings daemon with the node token, which the panel hands over through the same key. Game servers are checked through Wings as well: running is up, starting or stopping is degraded, offline is down, and the check result shows memory and CPU. Each server depends on its node, so a dead node is one alert. Suspended servers are added paused, and servers you delete in the panel disappear from heron. Names, groups and alert channels can be changed in heron like any other monitor.
 
 ## Moving from Uptime Kuma
 

@@ -49,8 +49,11 @@ type Engine struct {
 	log       *slog.Logger
 	publicURL atomic.Pointer[string]
 
-	mu   sync.Mutex
-	last map[int64]monitor.Status
+	mu      sync.Mutex
+	last    map[int64]monitor.Status
+	version atomic.Uint64
+	policy  Policy
+	guard   *guard
 }
 
 func New(s *store.Store, n Notifier, calendar *maintenance.Calendar, log *slog.Logger, publicURL string) *Engine {
@@ -61,6 +64,8 @@ func New(s *store.Store, n Notifier, calendar *maintenance.Calendar, log *slog.L
 		calendar: calendar,
 		log:      log,
 		last:     map[int64]monitor.Status{},
+		policy:   DefaultPolicy(),
+		guard:    newGuard(),
 	}
 	e.SetPublicURL(publicURL)
 	return e
@@ -80,7 +85,7 @@ func (e *Engine) ReloadMaintenance(ctx context.Context) error {
 		return err
 	}
 	e.calendar.Set(windows)
-	e.events.Publish(Event{Type: EventLayout, Public: true})
+	e.announce(Event{Type: EventLayout, Public: true})
 	return nil
 }
 
@@ -112,10 +117,10 @@ func (e *Engine) Record(ctx context.Context, beat scheduler.Beat) {
 	switch {
 	case current == monitor.StatusDown && previous != monitor.StatusDown:
 		log.Warn("monitor is down", "reason", res.Message)
-		e.wentDown(ctx, m, res)
+		e.down(ctx, m, res)
 	case previous == monitor.StatusDown && current.Healthy():
 		log.Info("monitor recovered", "latency", res.Latency)
-		e.recovered(ctx, m, res)
+		e.up(ctx, m, res)
 	case previous == monitor.StatusDown && current == monitor.StatusMaintenance:
 		log.Info("maintenance started while down")
 		e.resolve(ctx, m, res.At, func(time.Duration) string {
@@ -124,6 +129,10 @@ func (e *Engine) Record(ctx context.Context, beat scheduler.Beat) {
 	case previous != current:
 		log.Info("status changed", "from", previous, "to", current)
 	}
+	if previous != current {
+		e.version.Add(1)
+	}
+	e.settle(ctx, m, current, res.At)
 
 	e.events.Publish(Event{
 		Type:      EventMonitor,
@@ -141,6 +150,11 @@ func (e *Engine) Forget(id int64) {
 	e.mu.Lock()
 	delete(e.last, id)
 	e.mu.Unlock()
+	e.release(id)
+	e.guard.mu.Lock()
+	delete(e.guard.flips, id)
+	delete(e.guard.flapping, id)
+	e.guard.mu.Unlock()
 }
 
 func (e *Engine) WatchMaintenance(ctx context.Context) {
@@ -155,7 +169,7 @@ func (e *Engine) WatchMaintenance(ctx context.Context) {
 			}
 		}
 		if !slices.Equal(now, active) {
-			e.events.Publish(Event{Type: EventLayout, Public: true})
+			e.announce(Event{Type: EventLayout, Public: true})
 		}
 		active = now
 
@@ -167,7 +181,7 @@ func (e *Engine) WatchMaintenance(ctx context.Context) {
 	}
 }
 
-func (e *Engine) wentDown(ctx context.Context, m *monitor.Monitor, res monitor.Result) {
+func (e *Engine) wentDown(ctx context.Context, m *monitor.Monitor, res monitor.Result, quiet bool) {
 	_, err := e.store.OpenAutomaticIncident(ctx, m.ID)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
@@ -183,24 +197,38 @@ func (e *Engine) wentDown(ctx context.Context, m *monitor.Monitor, res monitor.R
 		if err := e.store.CreateIncident(ctx, inc, body); err != nil {
 			e.log.Error("open incident", "monitor", m.Slug, "err", err)
 		} else {
-			e.events.Publish(Event{Type: EventIncident})
+			e.announce(Event{Type: EventIncident})
 		}
 	case err != nil:
 		e.log.Error("find incident", "monitor", m.Slug, "err", err)
 	}
 
+	if quiet {
+		return
+	}
+	reason := res.Message
+	if n := e.dependents(ctx, m.ID); n > 0 {
+		if n == 1 {
+			reason += "\nOne monitor depends on it. Its alert is held back while this one is down."
+		} else {
+			reason += fmt.Sprintf("\n%d monitors depend on it. Their alerts are held back while this one is down.", n)
+		}
+	}
 	e.notify(ctx, m, notify.Message{
 		Event:  notify.EventDown,
 		Status: monitor.StatusDown,
-		Reason: res.Message,
+		Reason: reason,
 		At:     res.At,
 	})
 }
 
-func (e *Engine) recovered(ctx context.Context, m *monitor.Monitor, res monitor.Result) {
+func (e *Engine) recovered(ctx context.Context, m *monitor.Monitor, res monitor.Result, quiet bool) {
 	downtime := e.resolve(ctx, m, res.At, func(d time.Duration) string {
 		return fmt.Sprintf("Service recovered after %s.", d.Round(time.Second))
 	})
+	if quiet {
+		return
+	}
 
 	e.notify(ctx, m, notify.Message{
 		Event:    notify.EventRecovered,
@@ -224,7 +252,7 @@ func (e *Engine) resolve(ctx context.Context, m *monitor.Monitor, at time.Time, 
 		e.log.Error("resolve incident", "monitor", m.Slug, "err", err)
 		return downtime
 	}
-	e.events.Publish(Event{Type: EventIncident})
+	e.announce(Event{Type: EventIncident})
 	return downtime
 }
 
@@ -266,7 +294,7 @@ func (e *Engine) Link(m *monitor.Monitor) string {
 }
 
 func (e *Engine) Changed(m *monitor.Monitor) {
-	e.events.Publish(Event{
+	e.announce(Event{
 		Type:      EventLayout,
 		MonitorID: m.ID,
 		Slug:      m.Slug,
@@ -276,7 +304,7 @@ func (e *Engine) Changed(m *monitor.Monitor) {
 }
 
 func (e *Engine) IncidentsChanged() {
-	e.events.Publish(Event{Type: EventIncident})
+	e.announce(Event{Type: EventIncident})
 }
 
 func (e *Engine) Housekeep(ctx context.Context, retention time.Duration) {
@@ -303,4 +331,13 @@ func (e *Engine) Housekeep(ctx context.Context, retention time.Duration) {
 			run()
 		}
 	}
+}
+
+func (e *Engine) Version() uint64 {
+	return e.version.Load()
+}
+
+func (e *Engine) announce(ev Event) {
+	e.version.Add(1)
+	e.events.Publish(ev)
 }

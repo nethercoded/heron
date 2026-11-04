@@ -10,8 +10,10 @@ import (
 
 	"github.com/nethercoded/heron/internal/auth"
 	"github.com/nethercoded/heron/internal/engine"
+	"github.com/nethercoded/heron/internal/expiry"
 	"github.com/nethercoded/heron/internal/monitor"
 	"github.com/nethercoded/heron/internal/notify"
+	"github.com/nethercoded/heron/internal/pelican"
 	"github.com/nethercoded/heron/internal/site"
 	"github.com/nethercoded/heron/internal/store"
 	"github.com/nethercoded/heron/internal/update"
@@ -37,6 +39,8 @@ type Options struct {
 	Assets         fs.FS
 	Updates        *update.Service
 	Checker        monitor.Checker
+	Expiry         *expiry.Service
+	Pelican        *pelican.Service
 	DemoUser       string
 	DemoPassword   string
 }
@@ -52,6 +56,8 @@ type Server struct {
 	ceremonies *auth.Tickets[ceremony]
 	log        *slog.Logger
 	opts       Options
+
+	statusCache statusCache
 }
 
 func New(s *store.Store, e *engine.Engine, sched Scheduler, sender Sender, sessions *auth.Sessions, log *slog.Logger, opts Options) *Server {
@@ -175,6 +181,13 @@ func (s *Server) Handler() http.Handler {
 
 	admin.Handle("GET /api/admin/audit", s.handle(s.listAudit))
 
+	admin.Handle("GET /api/admin/pelican", s.handle(s.role(store.RoleAdmin, s.getPelican)))
+	admin.Handle("PUT /api/admin/pelican", owner("settings.pelican", s.savePelican))
+	admin.Handle("POST /api/admin/pelican/sync", s.handle(s.syncPelican))
+
+	admin.Handle("GET /api/admin/expiry", s.handle(s.listExpiry))
+	admin.Handle("POST /api/admin/expiry/check", s.handle(s.checkExpiry))
+
 	admin.Handle("GET /api/admin/backup", owner("backup.download", s.downloadBackup))
 	admin.Handle("POST /api/admin/import/kuma/preview", s.handle(s.role(store.RoleAdmin, s.previewKuma)))
 	admin.Handle("POST /api/admin/import/kuma", do("monitor.import", s.importKuma))
@@ -199,7 +212,7 @@ func (s *Server) Handler() http.Handler {
 		return errorf(http.StatusForbidden, "cross_origin", "cross-origin request rejected")
 	}))
 
-	return s.observe(secureHeaders(csrf.Handler(mux)))
+	return s.observe(secureHeaders(compress(csrf.Handler(mux))))
 }
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) error {

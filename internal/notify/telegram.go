@@ -79,6 +79,12 @@ func telegramText(msg Message) string {
 		fmt.Fprintf(&b, "🔴 <b>%s is down</b>\n", esc(msg.Monitor.Name))
 	case EventRecovered:
 		fmt.Fprintf(&b, "🟢 <b>%s is back up</b>\n", esc(msg.Monitor.Name))
+	case EventFlapping:
+		fmt.Fprintf(&b, "🟡 <b>%s keeps going up and down</b>\n", esc(msg.Monitor.Name))
+	case EventStable:
+		fmt.Fprintf(&b, "🔵 <b>%s is stable again</b>\n", esc(msg.Monitor.Name))
+	case EventExpiring:
+		fmt.Fprintf(&b, "⏳ <b>%s</b>\n", esc(msg.Title))
 	default:
 		fmt.Fprintf(&b, "🔔 <b>Test notification from heron</b>\n")
 	}

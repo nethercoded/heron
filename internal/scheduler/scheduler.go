@@ -201,9 +201,11 @@ func jitter(interval time.Duration) time.Duration {
 }
 
 type tracker struct {
-	retries  int
-	failures int
-	status   monitor.Status
+	retries      int
+	recoverAfter int
+	failures     int
+	successes    int
+	status       monitor.Status
 }
 
 func newTracker(m *monitor.Monitor) *tracker {
@@ -211,16 +213,23 @@ func newTracker(m *monitor.Monitor) *tracker {
 	if status == "" || status == monitor.StatusPaused {
 		status = monitor.StatusPending
 	}
-	return &tracker{retries: m.Retries, status: status}
+	return &tracker{retries: m.Retries, recoverAfter: m.Settings.RecoverAfter, status: status}
 }
 
 func (t *tracker) observe(status monitor.Status) monitor.Status {
 	if status != monitor.StatusDown {
 		t.failures = 0
+		if t.status == monitor.StatusDown && status.Healthy() {
+			if t.successes++; t.successes < t.recoverAfter {
+				return status
+			}
+		}
+		t.successes = 0
 		t.status = status
 		return status
 	}
 
+	t.successes = 0
 	t.failures++
 	if t.status != monitor.StatusDown && t.failures <= t.retries {
 		return monitor.StatusPending

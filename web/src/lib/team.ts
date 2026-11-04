@@ -55,6 +55,7 @@ const actions: Record<string, string> = {
 	'settings.metrics_token': 'issued a new metrics token',
 	'settings.metrics_off': 'turned off metrics',
 	'settings.auto_update': 'turned automatic updates',
+	'settings.pelican': 'turned the Pelican integration',
 	'update.install': 'installed heron',
 	'backup.download': 'downloaded a backup'
 };

@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	discordRed   = 0xe5484d
-	discordGreen = 0x30a46c
-	discordGray  = 0x8b8d98
+	discordRed    = 0xe5484d
+	discordGreen  = 0x30a46c
+	discordYellow = 0xf5c53b
+	discordGray   = 0x8b8d98
 )
 
 type Discord struct {
@@ -99,6 +100,15 @@ func discordPayload(msg Message, mention string) discordRequest {
 	case EventRecovered:
 		embed.Title = msg.Monitor.Name + " is back up"
 		embed.Color = discordGreen
+	case EventFlapping:
+		embed.Title = msg.Monitor.Name + " keeps going up and down"
+		embed.Color = discordYellow
+	case EventStable:
+		embed.Title = msg.Monitor.Name + " is stable again"
+		embed.Color = discordGreen
+	case EventExpiring:
+		embed.Title = msg.Title
+		embed.Color = discordYellow
 	default:
 		embed.Title = "Test notification from heron"
 	}
