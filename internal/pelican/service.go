@@ -46,7 +46,13 @@ type Service struct {
 	cache   map[int64]*snapshot
 	fetch   map[int64]*sync.Mutex
 	status  Status
+	last    history
 	running sync.Mutex
+}
+
+type history struct {
+	servers map[string]Server
+	names   map[int64]string
 }
 
 func New(s *store.Store, log *slog.Logger) *Service {
@@ -148,11 +154,23 @@ func (s *Service) sync(ctx context.Context) (int, int, error) {
 	}
 	s.mu.Lock()
 	s.nodes, s.servers = wired, owners
+	past := s.last
 	s.mu.Unlock()
 
-	if err := s.reconcile(ctx, cfg, nodes, servers); err != nil {
+	if err := s.reconcile(ctx, cfg, nodes, servers, past); err != nil {
 		return 0, 0, err
 	}
+
+	next := history{servers: make(map[string]Server, len(servers)), names: make(map[int64]string, len(nodes))}
+	for _, srv := range servers {
+		next.servers[srv.UUID] = srv
+	}
+	for _, n := range nodes {
+		next.names[n.ID] = n.Name
+	}
+	s.mu.Lock()
+	s.last = next
+	s.mu.Unlock()
 	return len(nodes), len(servers), nil
 }
 
@@ -160,9 +178,10 @@ func (s *Service) forget() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.nodes, s.servers, s.cache = map[int64]wingsNode{}, map[string]int64{}, map[int64]*snapshot{}
+	s.last = history{}
 }
 
-func (s *Service) reconcile(ctx context.Context, cfg store.Pelican, nodes []Node, servers []Server) error {
+func (s *Service) reconcile(ctx context.Context, cfg store.Pelican, nodes []Node, servers []Server, past history) error {
 	existing, err := s.Store.Monitors(ctx)
 	if err != nil {
 		return err
@@ -202,13 +221,6 @@ func (s *Service) reconcile(ctx context.Context, cfg store.Pelican, nodes []Node
 		seen[key] = true
 		parent := nodeMonitor[srv.Node]
 		group := nodeName[srv.Node]
-		if group == "" {
-			s.mu.Lock()
-			if n, ok := s.nodes[srv.Node]; ok {
-				group = n.node.Name
-			}
-			s.mu.Unlock()
-		}
 		m, ok := have[key]
 		if !ok {
 			m = &monitor.Monitor{
@@ -225,16 +237,13 @@ func (s *Service) reconcile(ctx context.Context, cfg store.Pelican, nodes []Node
 			}
 			continue
 		}
+		before, known := past.servers[srv.UUID]
 		changed := false
 		if m.Settings.DependsOn != parent {
 			m.Settings.DependsOn = parent
 			changed = true
 		}
-		if m.Paused != srv.Suspended {
-			m.Paused = srv.Suspended
-			changed = true
-		}
-		if m.Group != group {
+		if old, ok := past.names[before.Node]; known && ok && m.Group == old && m.Group != group {
 			m.Group = group
 			changed = true
 		}
@@ -243,6 +252,17 @@ func (s *Service) reconcile(ctx context.Context, cfg store.Pelican, nodes []Node
 				return err
 			}
 			s.changed(m, false)
+		}
+
+		suspendedNow := srv.Suspended && !m.Paused && (!known || !before.Suspended)
+		resumedNow := !srv.Suspended && m.Paused && known && before.Suspended
+		if suspendedNow || resumedNow {
+			updated, err := s.Store.SetPaused(ctx, m.ID, srv.Suspended)
+			if err != nil {
+				return err
+			}
+			s.Log.Info("followed the panel", "monitor", m.Slug, "suspended", srv.Suspended)
+			s.changed(updated, false)
 		}
 	}
 
