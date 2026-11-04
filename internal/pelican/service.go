@@ -201,12 +201,20 @@ func (s *Service) reconcile(ctx context.Context, cfg store.Pelican, nodes []Node
 		key := string(monitor.KindPelicanServer) + " " + srv.UUID
 		seen[key] = true
 		parent := nodeMonitor[srv.Node]
+		group := nodeName[srv.Node]
+		if group == "" {
+			s.mu.Lock()
+			if n, ok := s.nodes[srv.Node]; ok {
+				group = n.node.Name
+			}
+			s.mu.Unlock()
+		}
 		m, ok := have[key]
 		if !ok {
 			m = &monitor.Monitor{
 				Name:     srv.Name,
 				Slug:     monitor.Slugify(srv.Name),
-				Group:    nodeName[srv.Node],
+				Group:    group,
 				Kind:     monitor.KindPelicanServer,
 				Target:   srv.UUID,
 				Paused:   srv.Suspended,
@@ -217,8 +225,20 @@ func (s *Service) reconcile(ctx context.Context, cfg store.Pelican, nodes []Node
 			}
 			continue
 		}
+		changed := false
 		if m.Settings.DependsOn != parent {
 			m.Settings.DependsOn = parent
+			changed = true
+		}
+		if m.Paused != srv.Suspended {
+			m.Paused = srv.Suspended
+			changed = true
+		}
+		if m.Group != group {
+			m.Group = group
+			changed = true
+		}
+		if changed {
 			if err := s.Store.UpdateMonitor(ctx, m); err != nil {
 				return err
 			}
