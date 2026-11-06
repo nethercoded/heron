@@ -201,3 +201,15 @@ func (w Wings) get(ctx context.Context, path string, v any) error {
 	}
 	return json.UnmarshalRead(io.LimitReader(resp.Body, 16<<20), v)
 }
+
+type Utilization struct {
+	MemoryTotal uint64 `json:"memory_total"`
+	MemoryUsed  uint64 `json:"memory_used"`
+	DiskTotal   uint64 `json:"disk_total"`
+	DiskUsed    uint64 `json:"disk_used"`
+}
+
+func (w Wings) Utilization(ctx context.Context) (Utilization, error) {
+	var u Utilization
+	return u, w.get(ctx, "/api/system/utilization", &u)
+}

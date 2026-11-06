@@ -76,6 +76,7 @@ const (
 	EventFlapping  Event = "monitor.flapping"
 	EventStable    Event = "monitor.stable"
 	EventExpiring  Event = "expiry.soon"
+	EventWarning   Event = "monitor.warning"
 	EventTest      Event = "test"
 )
 

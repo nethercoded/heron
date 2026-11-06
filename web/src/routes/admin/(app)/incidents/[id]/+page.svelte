@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { ApiError, api, message } from '#lib/api.ts';
+	import BlackBox from '#lib/components/BlackBox.svelte';
 	import Field from '#lib/components/Field.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import IncidentCard from '#lib/components/IncidentCard.svelte';
@@ -84,8 +85,11 @@
 </PageHeader>
 
 <div class="grid gap-6 xl:grid-cols-[1fr_20rem]">
-	<div class="min-w-0">
+	<div class="min-w-0 space-y-6">
 		<IncidentCard {incident} expanded />
+		{#each data.evidence as item (item.id)}
+			<BlackBox evidence={item} />
+		{/each}
 	</div>
 
 	<aside class="space-y-6">

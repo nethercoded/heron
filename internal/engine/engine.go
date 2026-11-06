@@ -54,6 +54,8 @@ type Engine struct {
 	version atomic.Uint64
 	policy  Policy
 	guard   *guard
+
+	OnDown func(m *monitor.Monitor, incidentID int64, res monitor.Result)
 }
 
 func New(s *store.Store, n Notifier, calendar *maintenance.Calendar, log *slog.Logger, publicURL string) *Engine {
@@ -182,8 +184,11 @@ func (e *Engine) WatchMaintenance(ctx context.Context) {
 }
 
 func (e *Engine) wentDown(ctx context.Context, m *monitor.Monitor, res monitor.Result, quiet bool) {
-	_, err := e.store.OpenAutomaticIncident(ctx, m.ID)
+	var incidentID int64
+	open, err := e.store.OpenAutomaticIncident(ctx, m.ID)
 	switch {
+	case err == nil:
+		incidentID = open.ID
 	case errors.Is(err, store.ErrNotFound):
 		inc := &store.Incident{
 			Title:      m.Name + " is unavailable",
@@ -197,10 +202,14 @@ func (e *Engine) wentDown(ctx context.Context, m *monitor.Monitor, res monitor.R
 		if err := e.store.CreateIncident(ctx, inc, body); err != nil {
 			e.log.Error("open incident", "monitor", m.Slug, "err", err)
 		} else {
+			incidentID = inc.ID
 			e.announce(Event{Type: EventIncident})
 		}
 	case err != nil:
 		e.log.Error("find incident", "monitor", m.Slug, "err", err)
+	}
+	if e.OnDown != nil {
+		go e.OnDown(m, incidentID, res)
 	}
 
 	if quiet {

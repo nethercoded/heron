@@ -24,9 +24,11 @@ import (
 	"golang.org/x/term"
 
 	"github.com/nethercoded/heron/internal/auth"
+	"github.com/nethercoded/heron/internal/blackbox"
 	"github.com/nethercoded/heron/internal/config"
 	"github.com/nethercoded/heron/internal/engine"
 	"github.com/nethercoded/heron/internal/expiry"
+	"github.com/nethercoded/heron/internal/forecast"
 	"github.com/nethercoded/heron/internal/httpapi"
 	"github.com/nethercoded/heron/internal/maintenance"
 	"github.com/nethercoded/heron/internal/monitor"
@@ -186,6 +188,7 @@ func serve(args []string) error {
 	}
 
 	runCtx, cancelRun := context.WithCancel(context.Background())
+	eng.OnDown = blackbox.New(userAgent).Keeper(runCtx, db, log.With("component", "blackbox"))
 	sched.Start(runCtx, monitors)
 	go eng.Housekeep(runCtx, time.Duration(cfg.RetentionDays)*24*time.Hour)
 	go eng.WatchMaintenance(runCtx)
@@ -200,6 +203,14 @@ func serve(args []string) error {
 	}
 	go expiries.Run(runCtx)
 	go panel.Run(runCtx)
+	go (&forecast.Service{
+		Store:  db,
+		Panel:  panel,
+		Sender: dispatcher,
+		Link:   eng.Link,
+		Every:  15 * time.Minute,
+		Log:    log.With("component", "forecast"),
+	}).Run(runCtx)
 
 	restart := make(chan string, 1)
 	updates := &update.Service{

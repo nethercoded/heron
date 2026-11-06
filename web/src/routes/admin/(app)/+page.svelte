@@ -5,6 +5,7 @@
 	import Icon from '#lib/components/Icon.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import StatusBadge from '#lib/components/StatusBadge.svelte';
+	import Warnings from '#lib/components/Warnings.svelte';
 	import { ago, displayTarget, interval, latency, percent } from '#lib/format.ts';
 	import { Clock, debounce, Live } from '#lib/live.svelte.ts';
 	import { kindLabel, statusLabel } from '#lib/status.ts';
@@ -222,6 +223,8 @@
 		{/if}
 	{/snippet}
 </PageHeader>
+
+<Warnings warnings={data.warnings} linked />
 
 <section class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
 	<div class="rounded-card bg-surface px-5 py-4">

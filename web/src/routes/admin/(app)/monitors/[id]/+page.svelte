@@ -8,6 +8,7 @@
 	import Snippet from '#lib/components/Snippet.svelte';
 	import StatusBadge from '#lib/components/StatusBadge.svelte';
 	import UptimeCalendar from '#lib/components/UptimeCalendar.svelte';
+	import Warnings from '#lib/components/Warnings.svelte';
 	import { badgeMarkdown } from '#lib/embed.ts';
 	import { ago, between, displayTarget, formatDateTime, interval, latency } from '#lib/format.ts';
 	import { Clock, Live } from '#lib/live.svelte.ts';
@@ -119,6 +120,8 @@
 		<button class="btn-danger" onclick={remove} aria-label="Delete monitor"><Icon name="trash" /></button>
 	{/snippet}
 </PageHeader>
+
+<Warnings warnings={data.warnings} linked={false} />
 
 <div class="grid gap-6 xl:grid-cols-[1fr_18rem]">
 	<div class="min-w-0 space-y-6">

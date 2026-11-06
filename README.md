@@ -50,6 +50,10 @@ It checks your sites, APIs, databases, containers and game servers, keeps a year
 
 **Updates.** heron notices new releases on GitHub and can install them by itself. The owner sees the release notes in the panel and updates with one click, or lets heron do it on its own. If a new version does not come up healthy, heron goes back to the one that worked.
 
+**A black box for outages.** The moment a monitor goes down, heron records what it saw: the full answer with headers and body, where the time went, DNS, the certificate chain, the network route and, if Chromium is installed, a screenshot of the page. You find it on the incident, even if everything is back by the time you look.
+
+**Early warnings.** heron tells you before things break: a service that answers twice as slow as usual, checks that keep failing and passing on the retry, a game server close to its memory limit, a node whose disk fills up in a few days at the current pace.
+
 **Game server hosting.** Connect a Pelican or Pterodactyl panel and heron watches every node through Wings and every game server on it, with memory and CPU in the check result. New servers show up on their own and deleted ones go away.
 
 **Expiry.** Every domain and certificate behind your monitors on one screen, with a warning 30, 7 and 1 day before it runs out. Domains are looked up over RDAP, with WHOIS for zones like .ru that have no RDAP.
@@ -340,6 +344,29 @@ Three settings under **More settings** on every monitor keep the noise down.
 **Alert after** and **Back up after.** How many failed checks in a row make a monitor down, and how many good ones in a row bring it back.
 
 **Flapping.** When a monitor changes between up and down six times within an hour, heron sends one alert saying so and holds the rest. Once it has stayed in one state for half an hour, a last message says it is stable again.
+
+## The black box
+
+When a monitor goes down and opens an incident, heron looks at the target once more and keeps what it finds on the incident page under **What heron saw**:
+
+- the status, headers and the first 4 KB of the body, with cookies and authorization headers hidden
+- how long DNS, connecting, TLS, waiting and downloading took
+- what the name resolved to and the certificate chain the server sent
+- the route to the server, if `mtr`, `traceroute` or `tracepath` is installed
+- a screenshot of the page, if Chromium or Chrome is installed
+
+Up to three reports are kept per incident and they go away with it.
+
+## Early warnings
+
+Every 15 minutes heron looks for trouble that has not turned into an outage yet. A **Heads up** box on the monitor list and on the monitor page shows what it found, and the monitor's alert channels hear about each warning once a day while it lasts:
+
+- **Slower than usual.** The average answer over the last 6 hours is at least twice the usual one from the week before, and at least 150 ms slower.
+- **Failing quietly.** In the last day at least 5 checks, and at least 2% of them, failed and then passed on the retry.
+- **Near its memory limit.** A game server from Pelican uses 90% or more of its memory.
+- **Disk filling up.** heron samples the disk of every Pelican node once an hour and fits a line through the last week. If the disk will be full within two weeks at that pace, or is already 90% full, you hear about it.
+
+A warning disappears by itself once the reason is gone.
 
 ## Domain and certificate expiry
 

@@ -154,6 +154,8 @@ func (s *Server) Handler() http.Handler {
 	admin.Handle("PUT /api/admin/incidents/{id}", do("incident.update", s.updateIncident))
 	admin.Handle("DELETE /api/admin/incidents/{id}", do("incident.delete", s.deleteIncident))
 	admin.Handle("POST /api/admin/incidents/{id}/updates", do("incident.post", s.addIncidentUpdate))
+	admin.Handle("GET /api/admin/incidents/{id}/evidence", s.handle(s.role(store.RoleAdmin, s.incidentEvidence)))
+	admin.Handle("GET /api/admin/evidence/{id}/image", s.handle(s.role(store.RoleAdmin, s.evidenceImage)))
 
 	admin.Handle("GET /api/admin/maintenance", s.handle(s.listMaintenance))
 	admin.Handle("POST /api/admin/maintenance", do("maintenance.create", s.createMaintenance))
@@ -186,6 +188,7 @@ func (s *Server) Handler() http.Handler {
 	admin.Handle("POST /api/admin/pelican/sync", s.handle(s.syncPelican))
 
 	admin.Handle("GET /api/admin/expiry", s.handle(s.listExpiry))
+	admin.Handle("GET /api/admin/warnings", s.handle(s.listWarnings))
 	admin.Handle("POST /api/admin/expiry/check", s.handle(s.checkExpiry))
 
 	admin.Handle("GET /api/admin/backup", owner("backup.download", s.downloadBackup))

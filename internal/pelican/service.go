@@ -419,3 +419,30 @@ func (s *Service) states(ctx context.Context, nodeID int64, w Wings) (map[string
 	s.mu.Unlock()
 	return states, err
 }
+
+func (s *Service) NodeUtilization(ctx context.Context, target string) (Utilization, error) {
+	id, _ := strconv.ParseInt(target, 10, 64)
+	n, ok := s.node(id)
+	if !ok {
+		return Utilization{}, errors.New("waiting for the first sync with pelican")
+	}
+	return n.wings.Utilization(ctx)
+}
+
+func (s *Service) ServerMemory(target string) (used, limit int64, ok bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	node, known := s.servers[target]
+	if !known {
+		return 0, 0, false
+	}
+	snap := s.cache[node]
+	if snap == nil || snap.err != nil {
+		return 0, 0, false
+	}
+	st, found := snap.states[target]
+	if !found || st.Usage.MemoryLimit <= 0 || st.State != "running" {
+		return 0, 0, false
+	}
+	return st.Usage.Memory, st.Usage.MemoryLimit, true
+}

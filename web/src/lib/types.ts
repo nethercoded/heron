@@ -360,3 +360,47 @@ export interface PelicanSettings {
 	channel_ids: number[];
 	status: { synced_at?: string; nodes: number; servers: number; error?: string; syncing: boolean };
 }
+
+export interface BlackBoxReport {
+	at: string;
+	target: string;
+	reason: string;
+	dns?: { host: string; addresses?: string[]; cname?: string; took_ms: number; error?: string };
+	connect?: { address: string; took_ms: number; error?: string };
+	tls?: {
+		version?: string;
+		valid: boolean;
+		error?: string;
+		chain?: { subject: string; issuer: string; not_after: string; names?: string[] }[];
+	};
+	response?: {
+		status?: string;
+		code?: number;
+		remote?: string;
+		headers?: { name: string; value: string }[];
+		body?: string;
+		cut?: boolean;
+		redirect?: string;
+		error?: string;
+		timing: { dns_ms: number; connect_ms: number; tls_ms: number; first_byte_ms: number; total_ms: number };
+	};
+	route?: { tool: string; output?: string; error?: string };
+	notes?: string[];
+}
+
+export interface Evidence {
+	id: number;
+	monitor_id: number;
+	monitor_name: string;
+	at: string;
+	report: BlackBoxReport;
+	image: boolean;
+}
+
+export interface Warning {
+	monitor_id: number;
+	monitor_name: string;
+	kind: 'slow' | 'hidden_failures' | 'memory' | 'disk';
+	message: string;
+	since: string;
+}

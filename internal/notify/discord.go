@@ -106,7 +106,7 @@ func discordPayload(msg Message, mention string) discordRequest {
 	case EventStable:
 		embed.Title = msg.Monitor.Name + " is stable again"
 		embed.Color = discordGreen
-	case EventExpiring:
+	case EventExpiring, EventWarning:
 		embed.Title = msg.Title
 		embed.Color = discordYellow
 	default:
